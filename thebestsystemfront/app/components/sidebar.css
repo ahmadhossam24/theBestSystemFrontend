@@ -1,0 +1,140 @@
+.sidebar {
+  width: 280px;
+  height: 100vh;
+  background: #ffffff;
+  border-right: 1px solid #e9eef3;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, 'Inter', sans-serif;
+  overflow-y: auto;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: #f0f2f5;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+.sidebar-brand {
+  padding: 24px 20px;
+  border-bottom: 1px solid #edf2f7;
+  margin-bottom: 16px;
+}
+.sidebar-brand h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1e293b, #2d3a4b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.3px;
+}
+.sidebar-brand p {
+  font-size: 0.7rem;
+  color: #5b6e8c;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.nav-list {
+  list-style: none;
+  padding: 0 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  border-radius: 12px;
+}
+
+.nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #1e293b;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+.nav-header:hover {
+  background: #f8fafc;
+}
+.nav-header.active {
+  background: #eef2ff;
+  color: #1e40af;
+}
+.nav-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.nav-icon {
+  width: 20px;
+  font-size: 1.2rem;
+  color: #5b6e8c;
+}
+.nav-header.active .nav-icon {
+  color: #2563eb;
+}
+.chevron {
+  font-size: 0.8rem;
+  color: #8a99b0;
+  transition: transform 0.2s;
+}
+
+.submenu {
+  list-style: none;
+  margin-top: 6px;
+  margin-bottom: 8px;
+  padding-left: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.submenu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.submenu-item.active {
+  background: #eef2ff;
+  color: #1e40af;
+}
+.sub-icon {
+  width: 16px;
+  font-size: 0.8rem;
+  color: #7c8ba0;
+}
+.submenu-item.active .sub-icon {
+  color: #2563eb;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 20px 16px 24px;
+  border-top: 1px solid #edf2f7;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-align: center;
+}
