@@ -10,3 +10,14 @@
  * @property {string} date_deleted
  * @property {User} deleter
  */
+/**
+ * @typedef {Object} User
+ * @property {string} id
+ * @property {string} username
+ * @property {string} first_name
+ * @property {string} last_name
+ * @property {string} email
+ * @property {string} role
+ * @property {string} name
+ * @property {string} agent_role
+ */

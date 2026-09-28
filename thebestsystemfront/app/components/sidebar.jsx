@@ -27,6 +27,7 @@ import {
   FaPalette,
   FaChevronDown,
   FaChevronRight,
+  FaTrash,
 } from "react-icons/fa";
 import "./sidebar.css";
 
@@ -45,6 +46,7 @@ const sections = [
     hasSubmenu: true,
     submenuItems: [
       { id: "branches-all", label: "All Branches", icon: FaList ,path: "/branches/all"},
+      { id: "branches-all", label: "Deleted Branches", icon: FaList ,path: "/branches/deleted"},
       { id: "branches-add", label: "Add Branch", icon: FaPlusCircle ,path: "/branches/add"},
       { id: "branches-settings", label: "Branch Settings", icon: FaSlidersH ,path:"/branches/settings"}
     ],
@@ -56,6 +58,7 @@ const sections = [
     hasSubmenu: true,
     submenuItems: [
       { id: "teams-all", label: "All Teams", icon: FaUsers,path: "/teams/all" },
+      { id: "teams-all", label: "Deleted Teams", icon: FaUsers,path: "/teams/deleted" },
       { id: "teams-create", label: "Create Team", icon: FaUserPlus,path: "/teams/add" },
       { id: "teams-members", label: "Team Members", icon: FaUser,path: "/teams/members" },
     ],
@@ -67,6 +70,7 @@ const sections = [
     hasSubmenu: true,
     submenuItems: [
       { id: "users-all", label: "All Users", icon: FaUsers ,path: "/users/all"},
+      { id: "users-all", label: "Deleted Users", icon: FaUsers ,path: "/users/deleted"},
       { id: "users-roles", label: "Roles", icon: FaShieldAlt,path: "/users/roles" },
       { id: "users-permissions", label: "Permissions", icon: FaLock,path: "/users/permissions" },
     ],
@@ -77,9 +81,11 @@ const sections = [
     icon: FaDatabase,
     hasSubmenu: true,
     submenuItems: [
-      { id: "data-datasets", label: "Datasets", icon: FaTable,path: "/xxx" },
-      { id: "data-integrations", label: "Integrations", icon: FaPlug,path: "/xxx" },
-      { id: "data-backups", label: "Backups", icon: FaArchive ,path: "/xxx"},
+      { id: "data-datasets", label: "Main", icon: FaTable,path: "/main-table" },
+      { id: "data-integrations", label: "To Create", icon: FaPlug,path: "/create-table" },
+      { id: "data-backups", label: "Collection", icon: FaArchive ,path: "/collection-table"},
+      { id: "data-backosassaps", label: "Mail Response", icon: FaChartLine ,path: "/mail-response"},
+      { id: "data-trash", label: "Trash", icon: FaTrash ,path: "/trash-table"},
     ],
   },
   {
@@ -124,7 +130,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <h1>NexusCore</h1>
+        <h1>The Best</h1>
       </div>
       <nav className="sidebar-nav">
         <ul className="nav-list">
