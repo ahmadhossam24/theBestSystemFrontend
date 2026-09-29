@@ -42,23 +42,23 @@ const seedMailResponseRows = [
 const seedTrashRows = [];
 
 const seedRejectionRows = [
-  { id: nid(), landline: "0211112222", name: "Mostafa Ezz", contactPhone: "01011112222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "24-09-2026 09:00 AM" },
+  { id: nid(), landline: "0211112222", name: "Mostafa Ezz", contactPhone: "01011112222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
 ];
 
 const seedCleanRows = [
-  { id: nid(), landline: "0233334444", name: "Dina Kamal", contactPhone: "01033334444", agent: "Sara", feedback: "", agentNotes: "", uploadDate: "24-09-2026 09:00 AM" },
+  { id: nid(), landline: "0233334444", name: "Dina Kamal", contactPhone: "01033334444", agent: "Sara", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
 ];
 
 const seedCleanDeactivationRows = [
-  { id: nid(), landline: "0255556666", name: "Omar Nabil", contactPhone: "01055556666", amount: "450", deactivationState: "Pending", agent: "Emad", feedback: "", agentNotes: "", uploadDate: "24-09-2026 09:00 AM" },
+  { id: nid(), landline: "0255556666", name: "Omar Nabil", contactPhone: "01055556666", amount: "450", deactivationState: "Pending", agent: "Emad", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
 ];
 
 const seedNewRows = [
-  { id: nid(), landline: "0277778888", name: "Salma Tarek", contactPhone: "01077778888", address: "Nasr City, Cairo", agent: "", feedback: "", agentNotes: "", uploadDate: "24-09-2026 09:00 AM" },
+  { id: nid(), landline: "0277778888", name: "Salma Tarek", contactPhone: "01077778888", address: "Nasr City, Cairo", agent: "", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
 ];
 
 const seedCancellationRows = [
-  { id: nid(), landline: "0299990000", name: "Fady Ramzy", contactPhone: "01099990000", cancellationDate: "2026-09-20", sellerName: "Hana Sameh", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "24-09-2026 09:00 AM" },
+  { id: nid(), landline: "0299990000", name: "Fady Ramzy", contactPhone: "01099990000", cancellationDate: "2026-09-20", sellerName: "Hana Sameh", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
 ];
 
 const seedLogs = {};
@@ -79,7 +79,7 @@ const FALLBACK_LOG = [
   { text: "Nour added number at 23-09-2026 10:30 AM", id: "fallback-1" },
   { text: "Sara changed landline owner name from Ali to Emad at 23-09-2026 11:30 AM", id: "fallback-2" },
 ];
-console.log("here")
+
 const initialState = {
   main: seedMainRows,
   create: seedCreateRows,

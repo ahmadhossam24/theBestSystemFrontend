@@ -44,3 +44,20 @@ export const datasetColumns = {
     ...trailingColumns,
   ],
 };
+
+// Filters shown above each table. "select" -> single dropdown, exact match.
+// "dateRange" -> two date inputs; value is compared against the first 10
+// chars of the row's value, so the underlying string must start "YYYY-MM-DD".
+const baseFilters = [
+  { key: "agent", label: "Agent", type: "select", options: AGENT_OPTIONS.filter(Boolean) },
+  { key: "feedback", label: "Feedback", type: "select", options: FEEDBACK_OPTIONS.filter(Boolean) },
+  { key: "uploadDate", label: "Upload date", type: "dateRange" },
+];
+
+export const datasetFilters = {
+  rejection: baseFilters,
+  clean: baseFilters,
+  cleanDeactivation: baseFilters,
+  new: baseFilters,
+  cancellation: [...baseFilters, { key: "cancellationDate", label: "Cancellation date", type: "dateRange" }],
+};
