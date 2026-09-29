@@ -88,7 +88,7 @@ const sections = [
         submenuItems:[
           { id: "datasets-rej", label: "Rejection", icon: ImCross,path: "/datasets/rej" },
           { id: "datasets-clean", label: "Clean", icon: FaStar ,path: "/datasets/clean"},
-          { id: "datasets-cleandeactivation", label: "Clean Deactiv.", icon: FaDoorOpen ,path: "/datasets/clean-deactivation"},
+          { id: "datasets-cleandeactivation", label: "Clean Deactiv.", icon: FaDoorOpen ,path: "/datasets/cleandeactivation"},
           { id: "datasets-new", label: "New", icon: SiTicktick ,path: "/datasets/new"},
           { id: "datasets-cancellation", label: "Cancellation", icon: FaRecycle ,path: "/datasets/cancellation"},
         ] },

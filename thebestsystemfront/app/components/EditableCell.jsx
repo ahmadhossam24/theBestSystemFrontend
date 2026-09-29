@@ -47,6 +47,11 @@ export default function EditableCell({ value, type = "text", options = [], onSav
   }
 
   if (type === "select") {
+    // options can be plain strings ("Accept") or { value, label } objects,
+    // e.g. { value: "", label: "— Select —" } for a blank default.
+    const normalized = options.map((opt) =>
+      typeof opt === "string" ? { value: opt, label: opt === "" ? "— Select —" : opt } : opt
+    );
     return (
       <select
         ref={inputRef}
@@ -59,9 +64,9 @@ export default function EditableCell({ value, type = "text", options = [], onSav
         }}
         className="w-full min-w-[110px] rounded-md border border-blue-300 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none ring-2 ring-blue-100"
       >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
+        {normalized.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
           </option>
         ))}
       </select>
