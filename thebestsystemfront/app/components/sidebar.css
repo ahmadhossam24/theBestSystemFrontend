@@ -130,6 +130,30 @@
   color: #2563eb;
 }
 
+.submenu-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 35px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.submenu-submenu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.submenu-submenu-item.active {
+  background: #eef2ff;
+  color: #1e40af;
+}
+.submenu-submenu-item.active .sub-icon {
+  color: #2563eb;
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding: 20px 16px 24px;

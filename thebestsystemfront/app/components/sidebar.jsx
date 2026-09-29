@@ -25,11 +25,14 @@ import {
   FaGlobe,
   FaLock,
   FaPalette,
-  FaChevronDown,
-  FaChevronRight,
   FaTrash,
+  FaStar,
+  FaDoorOpen,
+  FaRecycle,
 } from "react-icons/fa";
 import "./sidebar.css";
+import { ImCross } from "react-icons/im";
+import { SiTicktick } from "react-icons/si";
 
 const sections = [
   {
@@ -81,7 +84,14 @@ const sections = [
     icon: FaDatabase,
     hasSubmenu: true,
     submenuItems: [
-      { id: "data-datasets", label: "Main", icon: FaTable,path: "/main-table" },
+      { id: "data-datasets", label: "Datasets", icon: FaTable,hasSubmenu:true, 
+        submenuItems:[
+          { id: "datasets-rej", label: "Rejection", icon: ImCross,path: "/datasets/rej" },
+          { id: "datasets-clean", label: "Clean", icon: FaStar ,path: "/datasets/clean"},
+          { id: "datasets-cleandeactivation", label: "Clean Deactiv.", icon: FaDoorOpen ,path: "/datasets/clean-deactivation"},
+          { id: "datasets-new", label: "New", icon: SiTicktick ,path: "/datasets/new"},
+          { id: "datasets-cancellation", label: "Cancellation", icon: FaRecycle ,path: "/datasets/cancellation"},
+        ] },
       { id: "data-integrations", label: "To Create", icon: FaPlug,path: "/create-table" },
       { id: "data-backups", label: "Collection", icon: FaArchive ,path: "/collection-table"},
       { id: "data-backosassaps", label: "Mail Response", icon: FaChartLine ,path: "/mail-response"},
@@ -127,6 +137,14 @@ export default function Sidebar() {
     setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
 
+  const isItemActive = (item) => {
+    if (item.path && pathname === item.path) return true;
+    if (item.submenuItems) {
+      return item.submenuItems.some(isItemActive);
+    }
+    return false;
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -137,7 +155,6 @@ export default function Sidebar() {
           {sections.map((section) => {
             const isSectionActive = pathname === section.path || 
               section.submenuItems?.some(sub => pathname === sub.path);
-
             return (
               <li key={section.id} className="nav-item">
                 {!section.hasSubmenu ? (
@@ -160,18 +177,50 @@ export default function Sidebar() {
                     {/* ... chevron logic ... */}
                   </div>
                 )}
-
                 {section.hasSubmenu && expandedSections[section.id] && (
                   <ul className="submenu">
                     {section.submenuItems.map((sub) => (
                       <li key={sub.id}>
-                        <Link 
-                          href={sub.path} 
-                          className={`submenu-item ${pathname === sub.path ? "active" : ""}`}
-                        >
-                          <sub.icon className="sub-icon" />
-                          <span>{sub.label}</span>
-                        </Link>
+                        {sub.hasSubmenu ? (
+                          <>
+                            <div
+                              className={`submenu-item ${isItemActive(sub) ? "active" : ""}`}
+                              onClick={() => toggleSection(sub.id)}
+                            >
+                              <sub.icon className="sub-icon" />
+                              <span>{sub.label}</span>
+                            </div>
+
+                            {expandedSections[sub.id] && (
+                              <ul className="nested-submenu">
+                                {sub.submenuItems.map((child) => (
+                                  <li key={child.id}>
+                                    <Link
+                                      href={child.path}
+                                      className={`submenu-submenu-item ${pathname === child.path ? "active" : ""}`}
+                                    >
+                                      <child.icon className="sub-icon" />
+                                      <span>{child.label}</span>
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </>
+                        ) : sub.path ? (
+                          <Link
+                            href={sub.path}
+                            className={`submenu-item ${pathname === sub.path ? "active" : ""}`}
+                          >
+                            <sub.icon className="sub-icon" />
+                            <span>{sub.label}</span>
+                          </Link>
+                        ) : (
+                          <div className="submenu-item">
+                            <sub.icon className="sub-icon" />
+                            <span>{sub.label}</span>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
