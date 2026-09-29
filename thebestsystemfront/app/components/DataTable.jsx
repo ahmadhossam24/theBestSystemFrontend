@@ -7,6 +7,7 @@ import RowActions from "./RowActions";
 import TrashModal from "./modals/TrashModal";
 import TableFilterBar from "./TableFilterBar";
 import TablePagination from "./TablePagination";
+import UploadButton from "./UploadButton";
 import { datasetFilters } from "../lib/datasetColumns";
 
 const PAGE_SIZE = 10;
@@ -18,7 +19,7 @@ const PAGE_SIZE = 10;
 export default function DataTable({ tableKey, title, subtitle, columns }) {
   const data = useData();
   const rows = data[tableKey] || [];
-  const { updateCell, deleteRow, trashRow } = data;
+  const { updateCell, deleteRow, trashRow, addRows } = data;
   const [trashModalRow, setTrashModalRow] = useState(null);
 
   const filterConfig = datasetFilters[tableKey] || [];
@@ -75,6 +76,10 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
         <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
           {filteredRows.length} of {rows.length} rows
         </span>
+      </div>
+
+      <div className="mb-4">
+        <UploadButton columns={columns} onImport={(newRows) => addRows(tableKey, newRows)} />
       </div>
 
       <TableFilterBar

@@ -17,6 +17,18 @@ const now = () => {
   return `${date} ${time}`;
 };
 
+// Year-first on purpose: uploadDate's first 10 chars ("YYYY-MM-DD") are used
+// directly for range-filter comparisons, so this must stay year-first even
+// though `now()` above (used for the human-readable log entries) is day-first.
+const uploadTimestamp = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+  return `${y}-${m}-${day} ${time}`;
+};
+
 const seedMainRows = [
   { id: nid(), landline: "0212345678", customerName: "Ahmed Youssef", date: "01-09-2026", landlineOwner: "Ahmed Youssef", phoneContact: "01001234567", assignedAgent: "Nour", feedback: "Accept", agentNotes: "Customer interested, will confirm tomorrow." },
   { id: nid(), landline: "0223456789", customerName: "Mona Adel", date: "03-09-2026", landlineOwner: "Ali Hassan", phoneContact: "01112345678", assignedAgent: "Sara", feedback: "No Answer", agentNotes: "Tried twice, no response." },
@@ -135,6 +147,19 @@ export function DataProvider({ children }) {
     });
   };
 
+  const addRows = (table, rowsData) => {
+    const stamp = uploadTimestamp();
+    setState((s) => {
+      const newRows = rowsData.map((r) => ({ ...r, id: nid(), uploadDate: stamp }));
+      const logs = { ...s.logs };
+      newRows.forEach((r) => {
+        logs[r.id] = [{ id: nid(), text: `You uploaded this row at ${stamp}` }];
+      });
+      return { ...s, [table]: [...s[table], ...newRows], logs };
+    });
+    showToast(`${rowsData.length} row${rowsData.length === 1 ? "" : "s"} uploaded successfully`);
+  };
+
   const deleteRow = (table, id) => {
     setState((s) => ({ ...s, [table]: s[table].filter((r) => r.id !== id) }));
     showToast("Row deleted");
@@ -179,6 +204,7 @@ export function DataProvider({ children }) {
       toast,
       showToast,
       updateCell: updateCellSafe,
+      addRows,
       deleteRow,
       trashRow,
       transferToCreate,
