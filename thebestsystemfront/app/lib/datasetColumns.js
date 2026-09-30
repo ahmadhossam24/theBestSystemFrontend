@@ -1,6 +1,23 @@
 // Shared option lists
 export const AGENT_OPTIONS = ["", "Nour", "Sara", "Emad"];
 export const FEEDBACK_OPTIONS = ["", "Accept", "No Answer", "Next time"];
+export const PAY_METHOD_OPTIONS = ["Installment", "Cash"];
+export const YES_NO_OPTIONS = ["Yes", "No"];
+
+// Human-readable label for a table key — used to stamp "data type" on rows
+// copied into the Accepts / Creation tables.
+export const DATASET_LABELS = {
+  rejection: "Rejection",
+  clean: "Clean",
+  cleanDeactivation: "Clean deactivation",
+  new: "New",
+  cancellation: "Cancellation",
+};
+export const MODEM_OPTIONS = ["", "Yes", "No"];
+export const PAYMENT_OPTIONS = ["", "Installment", "Cash"];
+export const PACKAGE_OPTIONS = ["", "330GB", "450GB"];
+export const SR_TYPE_OPTIONS = ["", "Red", "Normal"];
+export const PENDING_ASSIGNED_OPTIONS = ["", "Pending", "Assigned"];
 
 // Columns every dataset table ends with, in this order
 const trailingColumns = [

@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { draftKey } from "../lib/draftKey";
+import { DATASET_LABELS } from "../lib/datasetColumns";
 
 const DataContext = createContext(null);
 const STORAGE_KEY = "ops-dashboard-state-v1";
@@ -15,6 +17,11 @@ const now = () => {
   const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
   const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
   return `${date} ${time}`;
+};
+
+const todayDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 // Year-first on purpose: uploadDate's first 10 chars ("YYYY-MM-DD") are used
@@ -54,9 +61,7 @@ const seedMailResponseRows = [
 const seedTrashRows = [];
 
 const seedRejectionRows = [
-  { id: nid(), landline: "0211112222", name: "Mostafa Ezz", contactPhone: "01014412222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
-  { id: nid(), landline: "0211114212", name: "ali Ezz", contactPhone: "01011113222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
-  { id: nid(), landline: "0211115562", name: "john Ezz", contactPhone: "010111125622", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
+  { id: nid(), landline: "0211112222", name: "Mostafa Ezz", contactPhone: "01011112222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
 ];
 
 const seedCleanRows = [
@@ -105,8 +110,11 @@ const initialState = {
   cleanDeactivation: seedCleanDeactivationRows,
   new: seedNewRows,
   cancellation: seedCancellationRows,
+  accepts: [],
+  creation: [],
   trash: seedTrashRows,
   logs: seedLogs,
+  drafts: {},
 };
 
 export function DataProvider({ children }) {
@@ -181,6 +189,98 @@ export function DataProvider({ children }) {
     showToast(`${ids.length} row${ids.length === 1 ? "" : "s"} updated`);
   };
 
+  const saveDraft = (table, id, kind, values) => {
+    setState((s) => ({ ...s, drafts: { ...s.drafts, [draftKey(table, id, kind)]: values } }));
+  };
+
+  const clearDraft = (table, id, kind) => {
+    setState((s) => {
+      const drafts = { ...s.drafts };
+      delete drafts[draftKey(table, id, kind)];
+      return { ...s, drafts };
+    });
+  };
+
+  // Accept / Next time COPY the row into a destination table — the source
+  // row stays put (only its agentNotes gets updated from the popup).
+  const acceptRow = (table, id, form) => {
+    setState((s) => {
+      const row = s[table].find((r) => r.id === id);
+      if (!row) return s;
+
+      const newRow = {
+        id: nid(),
+        landline: row.landline,
+        name: row.name,
+        contact: row.contactPhone,
+        agent: row.agent,
+        agentNotes: form.agentNotes,
+        address: form.address,
+        landlineOwner: form.landlineOwner,
+        modem: form.modem,
+        payMethod: form.payMethod,
+        packageName: form.packageName,
+        status: "",
+        dataType: DATASET_LABELS[table] || table,
+        investigation: "",
+        landlineRing: "",
+        srVoda: "",
+        gsm: "",
+        acceptDate: todayDate(),
+        visitDate: "",
+        customerId: "",
+        followUpNotes: "",
+        naField: "N/A",
+        pendingOrAssigned: "",
+        furtherNotes: "",
+      };
+
+      const sourceRows = s[table].map((r) => (r.id === id ? { ...r, agentNotes: form.agentNotes } : r));
+      const logs = { ...s.logs };
+      logs[id] = [...(logs[id] || []), { id: nid(), text: `You marked Accept and copied this row to the Accepts table at ${now()}` }];
+      logs[newRow.id] = [{ id: nid(), text: `Copied from ${DATASET_LABELS[table] || table} table at ${now()}` }];
+
+      const drafts = { ...s.drafts };
+      delete drafts[draftKey(table, id, "Accept")];
+
+      return { ...s, [table]: sourceRows, accepts: [...s.accepts, newRow], logs, drafts };
+    });
+    showToast("Row copied to Accepts table");
+  };
+
+  const nextTimeRow = (table, id, form) => {
+    setState((s) => {
+      const row = s[table].find((r) => r.id === id);
+      if (!row) return s;
+
+      const newRow = {
+        id: nid(),
+        landline: row.landline,
+        name: row.name,
+        contact: row.contactPhone,
+        agent: row.agent,
+        agentNotes: form.agentNotes,
+        dataType: DATASET_LABELS[table] || table,
+        applyPhone: form.applyPhone,
+        srType: form.srType,
+        srEt: form.srEt,
+        srVod: form.srVod,
+        furtherNotes: "",
+      };
+
+      const sourceRows = s[table].map((r) => (r.id === id ? { ...r, agentNotes: form.agentNotes } : r));
+      const logs = { ...s.logs };
+      logs[id] = [...(logs[id] || []), { id: nid(), text: `You marked Next time and copied this row to the Creation table at ${now()}` }];
+      logs[newRow.id] = [{ id: nid(), text: `Copied from ${DATASET_LABELS[table] || table} table at ${now()}` }];
+
+      const drafts = { ...s.drafts };
+      delete drafts[draftKey(table, id, "Next time")];
+
+      return { ...s, [table]: sourceRows, creation: [...s.creation, newRow], logs, drafts };
+    });
+    showToast("Row copied to Creation table");
+  };
+
   const deleteRow = (table, id) => {
     setState((s) => ({ ...s, [table]: s[table].filter((r) => r.id !== id) }));
     showToast("Row deleted");
@@ -227,6 +327,10 @@ export function DataProvider({ children }) {
       updateCell: updateCellSafe,
       bulkUpdateField,
       addRows,
+      saveDraft,
+      clearDraft,
+      acceptRow,
+      nextTimeRow,
       deleteRow,
       trashRow,
       transferToCreate,

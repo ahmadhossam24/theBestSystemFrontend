@@ -9,7 +9,10 @@ import TableFilterBar from "./TableFilterBar";
 import TablePagination from "./TablePagination";
 import UploadButton from "./UploadButton";
 import BulkAssignBar from "./BulkAssignBar";
+import AcceptPopup from "./AcceptPopup";
+import NextTimePopup from "./NextTimePopup";
 import { datasetFilters, AGENT_OPTIONS } from "../lib/datasetColumns";
+import { draftKey } from "../lib/draftKey";
 
 const PAGE_SIZE = 10;
 const AGENT_CHOICES = AGENT_OPTIONS.filter(Boolean);
@@ -21,8 +24,9 @@ const AGENT_CHOICES = AGENT_OPTIONS.filter(Boolean);
 export default function DataTable({ tableKey, title, subtitle, columns }) {
   const data = useData();
   const rows = data[tableKey] || [];
-  const { updateCell, deleteRow, trashRow, addRows, bulkUpdateField } = data;
+  const { updateCell, deleteRow, trashRow, addRows, bulkUpdateField, drafts, saveDraft, acceptRow, nextTimeRow } = data;
   const [trashModalRow, setTrashModalRow] = useState(null);
+  const [feedbackPopup, setFeedbackPopup] = useState(null); // { kind: "Accept" | "Next time", row }
 
   const filterConfig = datasetFilters[tableKey] || [];
   const [search, setSearch] = useState("");
@@ -126,6 +130,13 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
     lastClickedIdRef.current = null;
   };
 
+  const handleFeedbackChange = (row, newValue) => {
+    updateCell(tableKey, row.id, "feedback", newValue, "Feedback");
+    if (newValue === "Accept" || newValue === "Next time") {
+      setFeedbackPopup({ kind: newValue, row });
+    }
+  };
+
   const applyBulkAgent = () => {
     if (!bulkAgent || selected.size === 0) return;
     bulkUpdateField(tableKey, Array.from(selected), "agent", bulkAgent, "Agent");
@@ -200,16 +211,38 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
                     onChange={(e) => handleRowCheck(row.id, e.target.checked, shiftHeldRef.current)}
                   />
                 </td>
-                {columns.map((c) => (
-                  <td key={c.key} className="px-1 py-1">
-                    <EditableCell
-                      value={row[c.key]}
-                      type={c.type || "text"}
-                      options={c.options}
-                      onSave={(v) => updateCell(tableKey, row.id, c.key, v, c.label)}
-                    />
-                  </td>
-                ))}
+                {columns.map((c) =>
+                  c.key === "feedback" ? (
+                    <td key={c.key} className="px-1 py-1">
+                      <div className="flex items-center gap-1">
+                        <EditableCell
+                          value={row.feedback}
+                          type="select"
+                          options={c.options}
+                          onSave={(v) => handleFeedbackChange(row, v)}
+                        />
+                        {(row.feedback === "Accept" || row.feedback === "Next time") && (
+                          <button
+                            title={`Edit ${row.feedback} details`}
+                            onClick={() => setFeedbackPopup({ kind: row.feedback, row })}
+                            className="shrink-0 text-sm text-blue-500 hover:text-blue-700"
+                          >
+                            ✎
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  ) : (
+                    <td key={c.key} className="px-1 py-1">
+                      <EditableCell
+                        value={row[c.key]}
+                        type={c.type || "text"}
+                        options={c.options}
+                        onSave={(v) => updateCell(tableKey, row.id, c.key, v, c.label)}
+                      />
+                    </td>
+                  )
+                )}
                 <td className="px-3 py-1">
                   <RowActions
                     rowId={row.id}
@@ -245,6 +278,34 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
           onConfirm={(notes) => {
             trashRow(tableKey, trashModalRow, notes);
             setTrashModalRow(null);
+          }}
+        />
+      )}
+
+      {feedbackPopup?.kind === "Accept" && (
+        <AcceptPopup
+          initialValues={drafts[draftKey(tableKey, feedbackPopup.row.id, "Accept")] || { agentNotes: feedbackPopup.row.agentNotes || "" }}
+          onCancel={(form) => {
+            saveDraft(tableKey, feedbackPopup.row.id, "Accept", form);
+            setFeedbackPopup(null);
+          }}
+          onSave={(form) => {
+            acceptRow(tableKey, feedbackPopup.row.id, form);
+            setFeedbackPopup(null);
+          }}
+        />
+      )}
+
+      {feedbackPopup?.kind === "Next time" && (
+        <NextTimePopup
+          initialValues={drafts[draftKey(tableKey, feedbackPopup.row.id, "Next time")] || { agentNotes: feedbackPopup.row.agentNotes || "" }}
+          onCancel={(form) => {
+            saveDraft(tableKey, feedbackPopup.row.id, "Next time", form);
+            setFeedbackPopup(null);
+          }}
+          onSave={(form) => {
+            nextTimeRow(tableKey, feedbackPopup.row.id, form);
+            setFeedbackPopup(null);
           }}
         />
       )}
