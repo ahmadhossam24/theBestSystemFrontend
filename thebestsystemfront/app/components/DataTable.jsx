@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "../context/DataContext";
 import EditableCell from "./EditableCell";
 import RowActions from "./RowActions";
@@ -8,9 +8,11 @@ import TrashModal from "./modals/TrashModal";
 import TableFilterBar from "./TableFilterBar";
 import TablePagination from "./TablePagination";
 import UploadButton from "./UploadButton";
-import { datasetFilters } from "../lib/datasetColumns";
+import BulkAssignBar from "./BulkAssignBar";
+import { datasetFilters, AGENT_OPTIONS } from "../lib/datasetColumns";
 
 const PAGE_SIZE = 10;
+const AGENT_CHOICES = AGENT_OPTIONS.filter(Boolean);
 
 /**
  * tableKey: matches a key in DataContext state, e.g. "rejection", "clean"
@@ -19,13 +21,19 @@ const PAGE_SIZE = 10;
 export default function DataTable({ tableKey, title, subtitle, columns }) {
   const data = useData();
   const rows = data[tableKey] || [];
-  const { updateCell, deleteRow, trashRow, addRows } = data;
+  const { updateCell, deleteRow, trashRow, addRows, bulkUpdateField } = data;
   const [trashModalRow, setTrashModalRow] = useState(null);
 
   const filterConfig = datasetFilters[tableKey] || [];
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({});
   const [page, setPage] = useState(1);
+
+  // ---- selection for bulk agent assignment ----
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkAgent, setBulkAgent] = useState("");
+  const lastClickedIdRef = useRef(null); // the anchor row's id — looked up fresh on every shift-click, never a stale index
+  const shiftHeldRef = useRef(false); // change events don't carry shiftKey, so capture it on click instead
 
   const hasActiveFilters =
     search.trim() !== "" ||
@@ -60,11 +68,69 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
     setPage(1);
   }, [search, JSON.stringify(filters), tableKey]);
 
+
+
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = filteredRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const rangeStart = filteredRows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const rangeEnd = (safePage - 1) * PAGE_SIZE + pageRows.length;
+
+  const allOnPageSelected = pageRows.length > 0 && pageRows.every((r) => selected.has(r.id));
+
+  // checked/shiftKey come from the real browser toggle (via onChange), so we
+  // never fight the native checkbox behavior — we just mirror it into state.
+  // The range is resolved from the anchor's *id*, looked up in the current
+  // pageRows right now — never a stored index that could go stale.
+  const handleRowCheck = (id, checked, shiftKey) => {
+    // Freeze the anchor now, before we move it. React (in dev) may re-run the
+    // updater below more than once for the same click — if it read the ref
+    // directly, a re-run could see the *new* anchor (already moved to `id`)
+    // and think anchor===target, collapsing the range to a single row.
+    const anchorId = lastClickedIdRef.current;
+    lastClickedIdRef.current = id;
+
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const anchorIndex = shiftKey && anchorId !== null ? pageRows.findIndex((r) => r.id === anchorId) : -1;
+      const targetIndex = pageRows.findIndex((r) => r.id === id);
+
+      if (shiftKey && anchorIndex !== -1 && targetIndex !== -1) {
+        const from = Math.min(anchorIndex, targetIndex);
+        const to = Math.max(anchorIndex, targetIndex);
+        for (let i = from; i <= to; i++) {
+          if (checked) next.add(pageRows[i].id);
+          else next.delete(pageRows[i].id);
+        }
+      } else if (checked) {
+        // no usable anchor (no shift held, or the anchor row scrolled/filtered out) — plain toggle
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      pageRows.forEach((r) => (allOnPageSelected ? next.delete(r.id) : next.add(r.id)));
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelected(new Set());
+    setBulkAgent("");
+    lastClickedIdRef.current = null;
+  };
+
+  const applyBulkAgent = () => {
+    if (!bulkAgent || selected.size === 0) return;
+    bulkUpdateField(tableKey, Array.from(selected), "agent", bulkAgent, "Agent");
+    clearSelection();
+  };
 
   return (
     <div>
@@ -95,10 +161,24 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
         hasActiveFilters={hasActiveFilters}
       />
 
+      {selected.size > 0 && (
+        <BulkAssignBar
+          count={selected.size}
+          agentOptions={AGENT_CHOICES}
+          agent={bulkAgent}
+          onAgentChange={setBulkAgent}
+          onApply={applyBulkAgent}
+          onClear={clearSelection}
+        />
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-slate-100">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <th className="w-10 px-3 py-3">
+                <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAllOnPage} />
+              </th>
               {columns.map((c) => (
                 <th key={c.key} className="whitespace-nowrap px-3 py-3">
                   {c.label}
@@ -109,7 +189,17 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {pageRows.map((row) => (
-              <tr key={row.id} className="hover:bg-slate-50/60">
+              <tr key={row.id} className={selected.has(row.id) ? "bg-blue-50/50" : "hover:bg-slate-50/60"}>
+                <td className="px-3 py-1">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(row.id)}
+                    onClick={(e) => {
+                      shiftHeldRef.current = e.shiftKey;
+                    }}
+                    onChange={(e) => handleRowCheck(row.id, e.target.checked, shiftHeldRef.current)}
+                  />
+                </td>
                 {columns.map((c) => (
                   <td key={c.key} className="px-1 py-1">
                     <EditableCell
@@ -131,7 +221,7 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 1} className="px-3 py-8 text-center text-sm text-slate-400">
+                <td colSpan={columns.length + 2} className="px-3 py-8 text-center text-sm text-slate-400">
                   {rows.length === 0 ? "No rows here. Upload a file to get started." : "No rows match your search or filters."}
                 </td>
               </tr>

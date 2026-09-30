@@ -54,7 +54,9 @@ const seedMailResponseRows = [
 const seedTrashRows = [];
 
 const seedRejectionRows = [
-  { id: nid(), landline: "0211112222", name: "Mostafa Ezz", contactPhone: "01011112222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
+  { id: nid(), landline: "0211112222", name: "Mostafa Ezz", contactPhone: "01014412222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
+  { id: nid(), landline: "0211114212", name: "ali Ezz", contactPhone: "01011113222", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
+  { id: nid(), landline: "0211115562", name: "john Ezz", contactPhone: "010111125622", rejReason: "Wrong number", agent: "Nour", feedback: "", agentNotes: "", uploadDate: "2026-09-24 09:00 AM" },
 ];
 
 const seedCleanRows = [
@@ -160,6 +162,25 @@ export function DataProvider({ children }) {
     showToast(`${rowsData.length} row${rowsData.length === 1 ? "" : "s"} uploaded successfully`);
   };
 
+  const bulkUpdateField = (table, ids, field, value, fieldLabel) => {
+    const idSet = new Set(ids);
+    setState((s) => {
+      const logs = { ...s.logs };
+      const rows = s[table].map((r) => {
+        if (!idSet.has(r.id)) return r;
+        const oldVal = r[field] ?? "";
+        if (String(oldVal) === String(value)) return r;
+        logs[r.id] = [
+          ...(logs[r.id] || []),
+          { id: nid(), text: `You changed ${fieldLabel} from "${oldVal || "empty"}" to "${value || "empty"}" at ${now()}` },
+        ];
+        return { ...r, [field]: value };
+      });
+      return { ...s, [table]: rows, logs };
+    });
+    showToast(`${ids.length} row${ids.length === 1 ? "" : "s"} updated`);
+  };
+
   const deleteRow = (table, id) => {
     setState((s) => ({ ...s, [table]: s[table].filter((r) => r.id !== id) }));
     showToast("Row deleted");
@@ -204,6 +225,7 @@ export function DataProvider({ children }) {
       toast,
       showToast,
       updateCell: updateCellSafe,
+      bulkUpdateField,
       addRows,
       deleteRow,
       trashRow,
