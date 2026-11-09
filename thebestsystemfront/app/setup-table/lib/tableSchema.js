@@ -46,7 +46,21 @@ export const FIXED_COLUMNS = [
   { key: "agentNotes", label: "Agent notes", type: "text", options: [], fixed: true },
 ];
 
-const FIXED_KEYS = new Set(FIXED_COLUMNS.map((c) => c.key));
+// Extra default column that only GENERAL tables have.
+export const GENERAL_ONLY_COLUMNS = [
+  { key: "datasetType", label: "Dataset type", type: "text", options: [], fixed: true },
+];
+
+// The default columns for a given table type (fresh copies, safe to store).
+export function getFixedColumns(tableType) {
+  const cols = tableType === "general" ? [...FIXED_COLUMNS, ...GENERAL_ONLY_COLUMNS] : FIXED_COLUMNS;
+  return cols.map((c) => ({ ...c }));
+}
+
+// Every default key/label of EITHER type is reserved, so a custom column can't
+// collide with one even if the table is later switched to the other type.
+const ALL_FIXED = [...FIXED_COLUMNS, ...GENERAL_ONLY_COLUMNS];
+const FIXED_KEYS = new Set(ALL_FIXED.map((c) => c.key));
 
 let uidCounter = 0;
 export const newUid = () => `c${Date.now().toString(36)}_${uidCounter++}`;
@@ -83,11 +97,12 @@ export function normalizeTable(t) {
     });
 
   const now = new Date().toISOString();
+  const tableType = t?.tableType === "dataset" ? "dataset" : "general";
   return {
     id: t?.id || makeTableId(),
     name: String(t?.name ?? "").trim(),
-    tableType: t?.tableType === "dataset" ? "dataset" : "general",
-    columns: [...FIXED_COLUMNS.map((c) => ({ ...c })), ...custom],
+    tableType,
+    columns: [...getFixedColumns(tableType), ...custom],
     retiredKeys: Array.isArray(t?.retiredKeys) ? t.retiredKeys.map(String) : [],
     createdAt: t?.createdAt || now,
     updatedAt: t?.updatedAt || now,
@@ -106,7 +121,7 @@ export function validateDraft(draft, allTables, editingId) {
     errors.name = "A table with this name already exists.";
   }
 
-  const seenLabels = new Set(FIXED_COLUMNS.map((c) => c.label.toLowerCase()));
+  const seenLabels = new Set(ALL_FIXED.map((c) => c.label.toLowerCase()));
   draft.customColumns.forEach((c) => {
     const label = c.label.trim();
     if (!label) {
@@ -164,7 +179,7 @@ export function buildTable(draft, existing) {
     id: existing?.id || makeTableId(),
     name: draft.name.trim(),
     tableType: draft.tableType,
-    columns: [...FIXED_COLUMNS.map((c) => ({ ...c })), ...custom],
+    columns: [...getFixedColumns(draft.tableType), ...custom],
     retiredKeys: [...retired],
     createdAt: existing?.createdAt || now,
     updatedAt: now,

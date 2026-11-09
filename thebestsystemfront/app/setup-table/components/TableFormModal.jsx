@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import ChoicesEditor from "./ChoicesEditor";
-import { COLUMN_TYPES, FIXED_COLUMNS, TABLE_TYPES, newUid, validateDraft } from "../lib/tableSchema";
-
+import { COLUMN_TYPES, TABLE_TYPES, getFixedColumns, newUid, validateDraft } from "../lib/tableSchema";
 const inputCls =
   "rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
 
@@ -89,7 +88,7 @@ export default function TableFormModal({ table, allTables, onClose, onSave }) {
             <p className="text-sm font-medium text-blue-900">These columns exist in every table by default</p>
             <p className="mt-0.5 text-xs text-blue-700/80">They can&apos;t be edited or removed.</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {FIXED_COLUMNS.map((c) => (
+              {getFixedColumns(draft.tableType).map((c) => (
                 <span key={c.key} className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-blue-100">
                   {c.label} <span className="text-slate-400">· {c.type}</span>
                 </span>
