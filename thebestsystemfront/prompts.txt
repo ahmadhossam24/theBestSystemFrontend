@@ -208,4 +208,5 @@ then sure i want table (To create ) which displays all the cells for every row (
 so i also want a page or table for month collection table  which has for every row all the previous attributes or cells and for transfer menu it will be (trash table only)
 i also want another table or page mail response store cells are landline - cus name - package name - agent - cash or installement - sr id - parent sr - address- gsm - rate plan - price group - type - case - status - adsl number - call feed back - creation date - sfid - account name - rtm
 and can be transfered to trash only 
-implement that     
+implement that  
+--------------------------------------------------------- 

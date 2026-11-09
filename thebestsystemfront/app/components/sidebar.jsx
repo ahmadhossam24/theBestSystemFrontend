@@ -33,7 +33,7 @@ import {
 import "./sidebar.css";
 import { ImCross } from "react-icons/im";
 import { SiTicktick } from "react-icons/si";
-
+import { BsWrenchAdjustable } from "react-icons/bs";
 const sections = [
   {
     id: "dashboard",
@@ -97,6 +97,13 @@ const sections = [
       { id: "data-backosassaps", label: "Mail Response", icon: FaChartLine ,path: "/mail-response"},
       { id: "data-trash", label: "Trash", icon: FaTrash ,path: "/trash-table"},
     ],
+  },
+  {
+    id: "setupTables",
+    label: "Setup Table",
+    icon: BsWrenchAdjustable,
+    hasSubmenu: false,
+    path:"/setup-table"
   },
   {
     id: "reports",

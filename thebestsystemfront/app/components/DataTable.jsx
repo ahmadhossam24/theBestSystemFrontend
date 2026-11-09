@@ -70,6 +70,7 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
   // reset to page 1 whenever the result set changes shape
   useEffect(() => {
     setPage(1);
+    console.log("DataTable mounted")
   }, [search, JSON.stringify(filters), tableKey]);
 
 
@@ -131,8 +132,10 @@ export default function DataTable({ tableKey, title, subtitle, columns }) {
   };
 
   const handleFeedbackChange = (row, newValue) => {
+    console.log("handler fired", newValue);
     updateCell(tableKey, row.id, "feedback", newValue, "Feedback");
     if (newValue === "Accept" || newValue === "Next time") {
+      console.log("setting popup");
       setFeedbackPopup({ kind: newValue, row });
     }
   };
