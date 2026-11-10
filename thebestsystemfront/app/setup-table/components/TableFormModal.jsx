@@ -1,39 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import ChoicesEditor from "./ChoicesEditor";
-import { COLUMN_TYPES, TABLE_TYPES, getFixedColumns, newUid, validateDraft } from "../lib/tableSchema";
+import ColumnListEditor from "./ColumnListEditor";
+import { TABLE_TYPES, getFixedColumns, newUid, validateDraft } from "../lib/tableSchema";
+
 const inputCls =
   "rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
 
 // Turns a stored table into the editable draft shape (or a blank draft).
+// Only the table's OWN extra columns are editable here.
 function toDraft(table) {
   return {
     name: table?.name ?? "",
     tableType: table?.tableType ?? "general",
     customColumns: (table?.columns ?? [])
-      .filter((c) => !c.fixed)
+      .filter((c) => c.origin === "custom")
       .map((c) => ({ _uid: newUid(), key: c.key, label: c.label, type: c.type, options: [...c.options] })),
   };
 }
 
-export default function TableFormModal({ table, allTables, onClose, onSave }) {
+export default function TableFormModal({ table, allTables, globals, onClose, onSave }) {
   const [draft, setDraft] = useState(() => toDraft(table));
   const [showErrors, setShowErrors] = useState(false);
 
-  const { valid, errors } = validateDraft(draft, allTables, table?.id);
-
-  const setColumn = (uid, patch) =>
-    setDraft((d) => ({ ...d, customColumns: d.customColumns.map((c) => (c._uid === uid ? { ...c, ...patch } : c)) }));
-
-  const addColumn = () =>
-    setDraft((d) => ({
-      ...d,
-      customColumns: [...d.customColumns, { _uid: newUid(), key: null, label: "", type: "text", options: [] }],
-    }));
-
-  const removeColumn = (uid) =>
-    setDraft((d) => ({ ...d, customColumns: d.customColumns.filter((c) => c._uid !== uid) }));
+  const { valid, errors } = validateDraft(draft, allTables, table?.id, globals);
 
   const submit = () => {
     if (!valid) {
@@ -83,10 +73,11 @@ export default function TableFormModal({ table, allTables, onClose, onSave }) {
             </label>
           </div>
 
-          {/* Fixed columns notice */}
+          {/* Default columns (not editable here) */}
           <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
             <p className="text-sm font-medium text-blue-900">These columns exist in every table by default</p>
-            <p className="mt-0.5 text-xs text-blue-700/80">They can&apos;t be edited or removed.</p>
+            <p className="mt-0.5 text-xs text-blue-700/80">They can&apos;t be edited or removed here.</p>
+
             <div className="mt-3 flex flex-wrap gap-1.5">
               {getFixedColumns(draft.tableType).map((c) => (
                 <span key={c.key} className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-blue-100">
@@ -94,68 +85,33 @@ export default function TableFormModal({ table, allTables, onClose, onSave }) {
                 </span>
               ))}
             </div>
+
+            {globals.columns.length > 0 && (
+              <>
+                <p className="mt-4 text-xs font-medium text-violet-800">
+                  Shared columns you added — also in every table (change them from &quot;Default columns&quot; on the main page)
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {globals.columns.map((c) => (
+                    <span key={c.key} className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 ring-1 ring-violet-100">
+                      {c.label} <span className="text-violet-400">· {c.type}</span>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Custom columns */}
+          {/* This table's own extra columns */}
           <div className="mt-5">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-600">Extra columns</p>
-              <button
-                type="button"
-                onClick={addColumn}
-                className="rounded-lg border border-slate-200 px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                + Add column
-              </button>
-            </div>
-
-            {draft.customColumns.length === 0 && (
-              <p className="rounded-lg border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-400">
-                No extra columns yet.
-              </p>
-            )}
-
-            <div className="flex flex-col gap-3">
-              {draft.customColumns.map((c) => (
-                <div key={c._uid} className="rounded-xl border border-slate-100 p-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      className={`${inputCls} flex-1`}
-                      value={c.label}
-                      placeholder="Column name"
-                      onChange={(e) => setColumn(c._uid, { label: e.target.value })}
-                    />
-                    <select
-                      className={inputCls}
-                      value={c.type}
-                      onChange={(e) => setColumn(c._uid, { type: e.target.value })}
-                    >
-                      {COLUMN_TYPES.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      title="Delete column"
-                      onClick={() => removeColumn(c._uid)}
-                      className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                    >
-                      🗑
-                    </button>
-                  </div>
-
-                  {c.type === "choices" && (
-                    <ChoicesEditor options={c.options} onChange={(options) => setColumn(c._uid, { options })} />
-                  )}
-
-                  {showErrors && errors.columns[c._uid] && (
-                    <p className="mt-1.5 text-xs text-red-500">{errors.columns[c._uid]}</p>
-                  )}
-                </div>
-              ))}
-            </div>
+            <ColumnListEditor
+              title="Extra columns (only in this table)"
+              emptyText="No extra columns yet."
+              columns={draft.customColumns}
+              errors={errors.columns}
+              showErrors={showErrors}
+              onChange={(customColumns) => setDraft((d) => ({ ...d, customColumns }))}
+            />
           </div>
         </div>
 
