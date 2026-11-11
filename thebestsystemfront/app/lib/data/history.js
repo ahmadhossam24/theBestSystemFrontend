@@ -6,7 +6,7 @@
 //   id, rowId,
 //   at:         ISO timestamp
 //   by:         name of the user who did it
-//   type:       "upload" | "edit"   (stage 4 adds "bulk-edit", stage 5 adds "transfer")
+//   type:       "upload" | "edit" | "bulk-edit" | "transfer"
 //   tableId, tableName     the table the user was in when it happened
 //   // edit only:
 //   columnKey, columnLabel, ownerTableId, from, to
@@ -35,6 +35,32 @@ export function makeEditEvent({ rowId, by, table, column, from, to }) {
   };
 }
 
+// Same fields as an edit, plus `bulkCount` = how many rows the one action changed.
+export function makeBulkEditEvent({ rowId, by, table, column, from, to, bulkCount, at }) {
+  return { ...makeEditEvent({ rowId, by, table, column, from, to }), type: "bulk-edit", bulkCount, ...(at ? { at } : {}) };
+}
+
+// Transfer into a general table. `from` is the general table the row was in ({id,name}) or null.
+// mode "copy": the row now also appears in the general table (it had none before; it stays in its dataset table).
+// mode "move": it left its previous general table for this one.
+export function makeTransferEvent({ rowId, by, table, from, to, mode, bulkCount, at }) {
+  return {
+    id: newEventId(),
+    rowId,
+    at: at || new Date().toISOString(),
+    by,
+    type: "transfer",
+    tableId: table.id,
+    tableName: table.name,
+    fromTableId: from?.id ?? null,
+    fromTableName: from?.name ?? "",
+    toTableId: to.id,
+    toTableName: to.name,
+    mode,
+    bulkCount: bulkCount ?? 1,
+  };
+}
+
 export function makeUploadEvent({ rowId, by, table, note = "", at }) {
   return {
     id: newEventId(),
@@ -56,6 +82,12 @@ export function describeEvent(e) {
       return `${e.by} added this row${e.note ? ` (${e.note})` : ""}`;
     case "edit":
       return `${e.by} changed ${e.columnLabel} from ${q(e.from)} to ${q(e.to)}`;
+    case "bulk-edit":
+      return `${e.by} changed ${e.columnLabel} from ${q(e.from)} to ${q(e.to)} (bulk change of ${Number(e.bulkCount || 1).toLocaleString()} rows)`;
+    case "transfer":
+      return e.mode === "move"
+        ? `${e.by} moved this row from ${e.fromTableName || "its previous table"} to ${e.toTableName}`
+        : `${e.by} transferred this row to ${e.toTableName}`;
     default:
       return `${e.by} did "${e.type}"`;
   }

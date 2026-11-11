@@ -1,18 +1,23 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTables } from "../../setup-table/hooks/useTables";
 import { useTableRows } from "../../lib/data/useTableRows";
-import { NO_DATASET, applyCellEdit, getCellValue, resolveColumns } from "../../lib/data/rowModel";
+import { NO_DATASET, applyCellEdit, getCellValue, isRowInTable, resolveColumns } from "../../lib/data/rowModel";
 import { activeFilters, buildFilterOptions, filterRows, filterableColumns } from "../../lib/data/filtering";
 import { makeEditEvent } from "../../lib/data/history";
+import { bulkColumns, planBulkEdit } from "../../lib/data/bulk";
+import { planTransfer, transferTargets } from "../../lib/data/transfer";
 import { useCurrentUser } from "../../lib/data/currentUser";
 import { makeSampleRows } from "../../lib/data/sampleRows";
-import { deleteSampleRows, putRows, saveRowWithEvent } from "../../lib/data/db";
+import { countSampleRows, deleteSampleRows, putRows, saveRowWithEvent } from "../../lib/data/db";
+import { buildImportedRows } from "../../lib/data/xlsxImport";
 import EditableCell from "../../components/EditableCell";
 import ColumnFilters from "../../components/ColumnFilters";
+import ImportButton from "../../components/ImportButton";
+import BulkEditBar from "../../components/BulkEditBar";
 import TablePagination from "../../components/TablePagination";
 
 const PAGE_SIZE = 10;
@@ -43,6 +48,18 @@ export default function TablePage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
+  const [selected, setSelected] = useState(() => new Set()); // ids of ticked rows
+  const anchorRef = useRef(null); // last ticked row, for shift-click ranges
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [dev, setDev] = useState(false); // ?dev=1 shows the temporary testing tools
+  const [leftoverSamples, setLeftoverSamples] = useState(0);
+
+  useEffect(() => {
+    try {
+      setDev(new URLSearchParams(window.location.search).get("dev") === "1");
+    } catch {}
+    countSampleRows().then(setLeftoverSamples, () => {});
+  }, []);
 
   const datasetTables = useMemo(() => tables.filter((t) => t.tableType === "dataset"), [tables]);
 
@@ -54,6 +71,8 @@ export default function TablePage() {
     setPage(1);
     setNotice("");
     setActionError("");
+    setSelected(new Set());
+    anchorRef.current = null;
   }, [tableId]);
 
   // A dataset type that was deleted can't stay selected.
@@ -64,6 +83,8 @@ export default function TablePage() {
   }, [datasetFilter, datasetTables]);
 
   const columns = useMemo(() => (table ? resolveColumns(table, tables, datasetFilter) : []), [table, tables, datasetFilter]);
+  // Excel headers are matched against the table's OWN columns (a direct upload has no dataset type).
+  const importColumns = useMemo(() => (table ? resolveColumns(table, tables, null) : []), [table, tables]);
   const filterCols = useMemo(() => filterableColumns(columns), [columns]);
 
   // rows of the chosen dataset type (before search / column filters)
@@ -84,7 +105,12 @@ export default function TablePage() {
   const anythingActive = activeCount > 0 || search.trim() !== "" || datasetFilter !== "";
 
   // Any change to what's being shown goes back to page 1.
-  useEffect(() => setPage(1), [datasetFilter, deferredSearch, filters]);
+  // A selection only makes sense for the list it was made in, so changing the list clears it.
+  useEffect(() => {
+    setPage(1);
+    setSelected(new Set());
+    anchorRef.current = null;
+  }, [datasetFilter, deferredSearch, filters]);
 
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -107,6 +133,106 @@ export default function TablePage() {
     } catch (e) {
       setActionError(`Could not save the change: ${e?.message || "unknown error"}`);
       reload();
+    }
+  };
+
+  // ---- Excel import -------------------------------------------------------
+  const importRecords = async ({ records, fileName }) => {
+    const { rows: fresh, events, stamp } = buildImportedRows(table, records, fileName, userName);
+    await putRows(fresh, events); // rows + history in one transaction: all or nothing
+    await reload();
+    setActionError("");
+    setNotice(`Imported ${fresh.length.toLocaleString()} row${fresh.length === 1 ? "" : "s"} from ${fileName} (upload date ${stamp}).`);
+  };
+
+  // ---- selecting + bulk edit ---------------------------------------------
+  const bulkCols = useMemo(() => bulkColumns(columns), [columns]);
+  const pageAllSelected = pageRows.length > 0 && pageRows.every((r) => selected.has(r.id));
+  const pageSomeSelected = pageRows.some((r) => selected.has(r.id));
+
+  // Plain click toggles one row. Shift-click ticks/unticks everything between the
+  // last-clicked row and this one (across pages, in the order currently shown).
+  const toggleRow = (rowId, checked, shift) => {
+    let ids = [rowId];
+    const anchor = anchorRef.current;
+    if (shift && anchor && anchor !== rowId) {
+      const a = visibleRows.findIndex((r) => r.id === anchor);
+      const b = visibleRows.findIndex((r) => r.id === rowId);
+      if (a !== -1 && b !== -1) ids = visibleRows.slice(Math.min(a, b), Math.max(a, b) + 1).map((r) => r.id);
+    }
+    anchorRef.current = rowId; // set here, never inside the updater (React runs updaters twice in dev)
+    setSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+
+  const togglePage = (checked) => {
+    const ids = pageRows.map((r) => r.id);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+
+  const selectAllMatching = () => setSelected(new Set(visibleRows.map((r) => r.id)));
+  const clearSelection = () => {
+    setSelected(new Set());
+    anchorRef.current = null;
+  };
+
+  const applyBulk = async (column, value) => {
+    setBulkBusy(true);
+    try {
+      const plan = planBulkEdit({ rows, ids: selected, column, value, by: userName, table, tables });
+      if (plan.changed > 0) {
+        await putRows(plan.nextRows, plan.events); // rows + history together, or nothing
+        const byId = new Map(plan.nextRows.map((r) => [r.id, r]));
+        setRows((prev) => prev.map((r) => byId.get(r.id) || r));
+      }
+      const bits = [`${plan.changed.toLocaleString()} changed`];
+      if (plan.unchanged) bits.push(`${plan.unchanged.toLocaleString()} already had that value`);
+      if (plan.skipped) bits.push(`${plan.skipped.toLocaleString()} skipped (not ${column.datasetName} rows)`);
+      setNotice(`${column.label} set to ${value === "" ? "empty" : `"${value}"`}: ${bits.join(", ")}.`);
+      setActionError("");
+      clearSelection();
+    } catch (e) {
+      setActionError(`Bulk change failed, nothing was changed: ${e?.message || "unknown error"}`);
+      reload();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  // Transfers only ever go INTO a general table (never a dataset table, never the one you're in).
+  const targets = useMemo(() => (table ? transferTargets(tables, table) : []), [tables, table]);
+
+  const transferSelected = async (targetId) => {
+    const target = tables.find((t) => t.id === targetId && t.tableType === "general");
+    if (!target) return;
+    setBulkBusy(true);
+    try {
+      const plan = planTransfer({ rows, ids: selected, target, table, by: userName, tables });
+      if (plan.nextRows.length > 0) {
+        await putRows(plan.nextRows, plan.events); // rows + history together, or nothing
+        const byId = new Map(plan.nextRows.map((r) => [r.id, r]));
+        // a dataset table still shows the row; a general table no longer does
+        setRows((prev) => prev.map((r) => byId.get(r.id) || r).filter((r) => isRowInTable(r, table)));
+      }
+      const bits = [];
+      if (plan.copied) bits.push(`${plan.copied.toLocaleString()} now also shown there`);
+      if (plan.moved) bits.push(`${plan.moved.toLocaleString()} moved`);
+      if (plan.unchanged) bits.push(`${plan.unchanged.toLocaleString()} already in it`);
+      setNotice(`Transferred to ${target.name}: ${bits.join(", ") || "nothing to do"}.`);
+      setActionError("");
+      clearSelection();
+    } catch (e) {
+      setActionError(`Transfer failed, nothing was changed: ${e?.message || "unknown error"}`);
+      reload();
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -175,9 +301,12 @@ export default function TablePage() {
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-            {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} rows
-          </span>
+          <div className="flex items-center gap-2">
+            <ImportButton table={table} columns={importColumns} onConfirm={importRecords} disabled={loading} />
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} rows
+            </span>
+          </div>
           <label className="flex items-center gap-1.5 text-xs text-slate-400" title="Placeholder until sign-in exists. Written into each change's history.">
             Acting as
             <input
@@ -247,12 +376,57 @@ export default function TablePage() {
         </div>
       )}
 
+      {notice && !dev && (
+        <p role="status" className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          {notice}
+        </p>
+      )}
+      {leftoverSamples > 0 && !dev && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {leftoverSamples.toLocaleString()} fake test rows from earlier testing are still stored.
+          <button
+            onClick={async () => {
+              await deleteSampleRows();
+              setLeftoverSamples(0);
+              await reload();
+            }}
+            className="font-medium underline"
+          >
+            Remove them
+          </button>
+        </p>
+      )}
+
+      {selected.size > 0 && (
+        <BulkEditBar
+          columns={bulkCols}
+          selected={selected.size}
+          totalMatching={visibleRows.length}
+          onSelectAll={selectAllMatching}
+          onClear={clearSelection}
+          onApply={applyBulk}
+          targets={targets}
+          onTransfer={transferSelected}
+          busy={bulkBusy}
+        />
+      )}
+
       {(error || actionError) && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error || actionError}</p>}
 
       <div className="overflow-x-auto rounded-xl border border-slate-100">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Select all rows on this page"
+                  checked={pageAllSelected}
+                  ref={(el) => el && (el.indeterminate = !pageAllSelected && pageSomeSelected)}
+                  onChange={(e) => togglePage(e.target.checked)}
+                  disabled={pageRows.length === 0}
+                />
+              </th>
               {columns.map((c) => (
                 <th key={c.cellId} className={`whitespace-nowrap px-3 py-3 ${c.fromDataset ? "bg-violet-50/70 text-violet-500" : ""}`}>
                   {c.label}
@@ -264,7 +438,15 @@ export default function TablePage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {pageRows.map((row) => (
-              <tr key={row.id} className="hover:bg-slate-50/60">
+              <tr key={row.id} className={selected.has(row.id) ? "bg-blue-50/60" : "hover:bg-slate-50/60"}>
+                <td className="w-10 px-3 py-1">
+                  <input
+                    type="checkbox"
+                    aria-label="Select row"
+                    checked={selected.has(row.id)}
+                    onChange={(e) => toggleRow(row.id, e.target.checked, e.nativeEvent.shiftKey)}
+                  />
+                </td>
                 {columns.map((c) => {
                   const v = getCellValue(row, c, tables);
                   if (c.readOnly) {
@@ -304,14 +486,14 @@ export default function TablePage() {
             ))}
             {!loading && pageRows.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 1} className="px-3 py-10 text-center text-sm text-slate-400">
+                <td colSpan={columns.length + 2} className="px-3 py-10 text-center text-sm text-slate-400">
                   {rows.length === 0 ? "No rows in this table yet." : "No rows match your search or filters."}
                 </td>
               </tr>
             )}
             {loading && pageRows.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 1} className="px-3 py-10 text-center text-sm text-slate-400">
+                <td colSpan={columns.length + 2} className="px-3 py-10 text-center text-sm text-slate-400">
                   Loading rows…
                 </td>
               </tr>
@@ -329,7 +511,8 @@ export default function TablePage() {
         onPageChange={setPage}
       />
 
-      {/* TEMPORARY — remove when Excel upload (stage 3) is in */}
+      {/* TEMPORARY testing tools — only with ?dev=1 in the address; removed in stage 6 */}
+      {dev && (
       <div className="mt-8 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 p-4">
         <p className="text-sm font-medium text-amber-900">Testing tools (temporary)</p>
         <p className="mt-0.5 text-xs text-amber-800/80">
@@ -366,6 +549,7 @@ export default function TablePage() {
           {notice && <span className="text-xs text-amber-900">{notice}</span>}
         </div>
       </div>
+      )}
     </div>
   );
 }

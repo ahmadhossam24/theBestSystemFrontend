@@ -110,6 +110,13 @@ export async function saveRowWithEvent(row, event) {
   return putRows([row], [event]);
 }
 
+// How many temporary sample rows exist (all tables).
+export async function countSampleRows() {
+  const db = await openDb();
+  const tx = db.transaction("rows", "readonly");
+  return wrap(tx.objectStore("rows").index("bySample").count(1));
+}
+
 // Removes every row flagged sample:1 AND those rows' history (temporary testing
 // helper). Returns how many rows were removed.
 export async function deleteSampleRows() {
