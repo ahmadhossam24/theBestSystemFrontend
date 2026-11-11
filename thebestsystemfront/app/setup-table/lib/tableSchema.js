@@ -46,26 +46,34 @@ export const COLUMN_TYPES = [
   { value: "choices", label: "Choices" },
 ];
 
+// Options of the built-in choices columns.
+// PLACEHOLDERS for now: agents will come from the signed-in users later, so only
+// this one list needs to change then. (Feedback: edit the list here if you add one.)
+export const AGENT_OPTIONS = ["Nour", "Sara", "Emad"];
+export const FEEDBACK_OPTIONS = ["Accept", "No Answer", "Next time"];
+
 // Present in every table, can't be edited or deleted by the user.
+// readOnly: true = system-managed value, the grid never lets users type into it.
 export const FIXED_COLUMNS = [
   { key: "landline", label: "Landline", type: "text", options: [], fixed: true, origin: "fixed" },
   { key: "name", label: "Name", type: "text", options: [], fixed: true, origin: "fixed" },
   { key: "contactPhone", label: "Contact phone", type: "text", options: [], fixed: true, origin: "fixed" },
-  { key: "uploadDate", label: "Upload date", type: "date", options: [], fixed: true, origin: "fixed" },
-  { key: "agent", label: "Agent", type: "text", options: [], fixed: true, origin: "fixed" },
-  { key: "feedback", label: "Feedback", type: "text", options: [], fixed: true, origin: "fixed" },
+  { key: "uploadDate", label: "Upload date", type: "date", options: [], fixed: true, origin: "fixed", readOnly: true },
+  { key: "agent", label: "Agent", type: "choices", options: AGENT_OPTIONS, fixed: true, origin: "fixed" },
+  { key: "feedback", label: "Feedback", type: "choices", options: FEEDBACK_OPTIONS, fixed: true, origin: "fixed" },
   { key: "agentNotes", label: "Agent notes", type: "text", options: [], fixed: true, origin: "fixed" },
 ];
 
-// Extra built-in column that only GENERAL tables have.
+// Extra built-in column that only GENERAL tables have. Its value is derived from
+// the row's dataset table, so it is read-only.
 export const GENERAL_ONLY_COLUMNS = [
-  { key: "datasetType", label: "Dataset type", type: "text", options: [], fixed: true, origin: "fixed" },
+  { key: "datasetType", label: "Dataset type", type: "text", options: [], fixed: true, origin: "fixed", readOnly: true },
 ];
 
 // Built-in columns for a given table type (fresh copies, safe to store).
 export function getFixedColumns(tableType) {
   const cols = tableType === "general" ? [...FIXED_COLUMNS, ...GENERAL_ONLY_COLUMNS] : FIXED_COLUMNS;
-  return cols.map((c) => ({ ...c }));
+  return cols.map((c) => ({ ...c, options: [...c.options] }));
 }
 
 // Built-in keys/labels of EITHER type are reserved everywhere, so a user column

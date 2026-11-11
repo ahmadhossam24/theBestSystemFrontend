@@ -1,9 +1,11 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import Link from "next/link";
 import { useTables } from "./hooks/useTables";
 import TableFormModal from "./components/TableFormModal";
 import DefaultColumnsModal from "./components/DefaultColumnsModal";
+import { countRowsForTable } from "../lib/data/db";
 
 const TYPE_STYLES = {
   general: "bg-slate-100 text-slate-600",
@@ -22,10 +24,38 @@ export default function SetupTablePage() {
   const [modal, setModal] = useState(null); // null | { kind: "table", table } | { kind: "defaults" }
   const [expandedId, setExpandedId] = useState(null);
 
-  const handleDelete = (t) => {
+  // A table that still holds rows can't be deleted — the rows would be orphaned.
+  const handleDelete = async (t) => {
+    let rowCount = 0;
+    try {
+      rowCount = await countRowsForTable(t.id);
+    } catch {
+      // storage unavailable: nothing could have been saved, so allow it
+    }
+    if (rowCount > 0) {
+      window.alert(`"${t.name}" still contains ${rowCount.toLocaleString()} row(s), so it can't be deleted.`);
+      return;
+    }
     if (window.confirm(`Delete table "${t.name}"? This removes its setup from local storage.`)) {
       deleteTable(t.id);
     }
+  };
+
+  // Switching general <-> dataset would break where its rows appear, so it's blocked while rows exist.
+  const handleSaveTable = async (draft, editingId) => {
+    const existing = editingId ? tables.find((t) => t.id === editingId) : null;
+    if (existing && existing.tableType !== draft.tableType) {
+      let rowCount = 0;
+      try {
+        rowCount = await countRowsForTable(existing.id);
+      } catch {}
+      if (rowCount > 0) {
+        window.alert(`"${existing.name}" still contains ${rowCount.toLocaleString()} row(s), so its type can't be changed.`);
+        return;
+      }
+    }
+    saveTable(draft, editingId);
+    setModal(null);
   };
 
   const handleSaveGlobals = (draftCols) => {
@@ -100,6 +130,12 @@ export default function SetupTablePage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
+                        <Link
+                          href={`/tables/${t.id}`}
+                          className="rounded-lg px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                        >
+                          Open
+                        </Link>
                         <button
                           title="Edit"
                           onClick={() => setModal({ kind: "table", table: t })}
@@ -158,10 +194,7 @@ export default function SetupTablePage() {
           allTables={tables}
           globals={globals}
           onClose={() => setModal(null)}
-          onSave={(draft, editingId) => {
-            saveTable(draft, editingId);
-            setModal(null);
-          }}
+          onSave={handleSaveTable}
         />
       )}
 
