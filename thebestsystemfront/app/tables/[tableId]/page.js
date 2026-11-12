@@ -11,7 +11,6 @@ import { makeEditEvent } from "../../lib/data/history";
 import { bulkColumns, planBulkEdit } from "../../lib/data/bulk";
 import { planTransfer, transferTargets } from "../../lib/data/transfer";
 import { useCurrentUser } from "../../lib/data/currentUser";
-import { makeSampleRows } from "../../lib/data/sampleRows";
 import { countSampleRows, deleteSampleRows, putRows, saveRowWithEvent } from "../../lib/data/db";
 import { buildImportedRows } from "../../lib/data/xlsxImport";
 import EditableCell from "../../components/EditableCell";
@@ -44,20 +43,15 @@ export default function TablePage() {
   const [filters, setFilters] = useState({});
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [page, setPage] = useState(1);
-  const [sampleCount, setSampleCount] = useState(25);
-  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
   const [selected, setSelected] = useState(() => new Set()); // ids of ticked rows
   const anchorRef = useRef(null); // last ticked row, for shift-click ranges
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [dev, setDev] = useState(false); // ?dev=1 shows the temporary testing tools
   const [leftoverSamples, setLeftoverSamples] = useState(0);
 
   useEffect(() => {
-    try {
-      setDev(new URLSearchParams(window.location.search).get("dev") === "1");
-    } catch {}
+    // One-time cleanup helper: fake rows left over from the testing tools of earlier stages.
     countSampleRows().then(setLeftoverSamples, () => {});
   }, []);
 
@@ -242,34 +236,6 @@ export default function TablePage() {
     setDatasetFilter("");
   };
 
-  // ---- temporary testing tools -------------------------------------------
-  const addSamples = async () => {
-    setBusy(true);
-    try {
-      const { rows: fake, events } = makeSampleRows(table, tables, sampleCount, userName);
-      await putRows(fake, events);
-      await reload();
-      setNotice(`Added ${sampleCount.toLocaleString()} sample rows.`);
-    } catch (e) {
-      setNotice(`Could not add rows: ${e?.message || "unknown error"}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeSamples = async () => {
-    setBusy(true);
-    try {
-      const n = await deleteSampleRows();
-      await reload();
-      setNotice(`Removed ${n.toLocaleString()} sample rows (from all tables).`);
-    } catch (e) {
-      setNotice(`Could not remove rows: ${e?.message || "unknown error"}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (!loaded) return <p className="text-sm text-slate-400">Loading…</p>;
 
   if (!table) {
@@ -376,12 +342,12 @@ export default function TablePage() {
         </div>
       )}
 
-      {notice && !dev && (
+      {notice && (
         <p role="status" className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           {notice}
         </p>
       )}
-      {leftoverSamples > 0 && !dev && (
+      {leftoverSamples > 0 && (
         <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
           {leftoverSamples.toLocaleString()} fake test rows from earlier testing are still stored.
           <button
@@ -510,46 +476,6 @@ export default function TablePage() {
         total={visibleRows.length}
         onPageChange={setPage}
       />
-
-      {/* TEMPORARY testing tools — only with ?dev=1 in the address; removed in stage 6 */}
-      {dev && (
-      <div className="mt-8 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 p-4">
-        <p className="text-sm font-medium text-amber-900">Testing tools (temporary)</p>
-        <p className="mt-0.5 text-xs text-amber-800/80">
-          Adds fake rows so you can see this table work before upload exists.
-          {isGeneral ? " Each fake row is given a random dataset type, as if it had been transferred in." : ""}
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select
-            value={sampleCount}
-            onChange={(e) => setSampleCount(Number(e.target.value))}
-            aria-label="Number of sample rows"
-            className="rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm text-slate-700"
-          >
-            {[25, 500, 5000].map((n) => (
-              <option key={n} value={n}>
-                {n.toLocaleString()} rows
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={addSamples}
-            disabled={busy}
-            className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-          >
-            Add sample rows
-          </button>
-          <button
-            onClick={removeSamples}
-            disabled={busy}
-            className="rounded-lg border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-          >
-            Remove all sample rows
-          </button>
-          {notice && <span className="text-xs text-amber-900">{notice}</span>}
-        </div>
-      </div>
-      )}
     </div>
   );
 }

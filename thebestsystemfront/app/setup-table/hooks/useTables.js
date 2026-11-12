@@ -11,6 +11,8 @@ import {
   buildGlobals,
 } from "../lib/tableSchema";
 
+const CHANGED_EVENT = "setup-tables-changed"; // same-tab "tables were saved" signal
+
 function readJson(key) {
   try {
     const raw = localStorage.getItem(key);
@@ -63,16 +65,23 @@ export function useTables() {
     }
   }, []);
 
-  // Keep several open tabs in sync.
+  // Keep other open tabs ("storage") and other components in THIS tab (e.g. the sidebar,
+  // which has its own copy of this hook) in sync.
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key !== STORAGE_KEY && e.key !== GLOBAL_STORAGE_KEY) return;
+    const reread = () => {
       const next = readAll();
       ref.current = next;
       setState(next);
     };
+    const onStorage = (e) => {
+      if (e.key === STORAGE_KEY || e.key === GLOBAL_STORAGE_KEY) reread();
+    };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(CHANGED_EVENT, reread);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(CHANGED_EVENT, reread);
+    };
   }, []);
 
   const commit = useCallback((next) => {
@@ -80,6 +89,7 @@ export function useTables() {
     writeJson(GLOBAL_STORAGE_KEY, next.globals);
     writeJson(STORAGE_KEY, next.tables);
     setState(next);
+    window.dispatchEvent(new Event(CHANGED_EVENT));
   }, []);
 
   // editingId = null -> add; otherwise update that table.
