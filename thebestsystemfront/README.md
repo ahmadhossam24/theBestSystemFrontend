@@ -1,36 +1,10 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Users Stage 2 — Branches, Teams, Users pages
 
-## Getting Started
+Copy the `app/` folder over your project (merge). New/changed: `first-run`, `branches/*`, `teams/*`, `users/*`, `components/org/*`, `lib/org/{session,demoSeed,orgService}.js`.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Open the app on **localhost or https** (password hashing needs a secure context).
+- Clear old browser storage once. First visit goes to /first-run: create the director, optionally load the demo organisation (password `demo1234`).
+- Pages: Branches (all/deleted/add), Teams (all/deleted/add/members), Users (all/deleted). Actions follow the role rules.
+- The "Switch user (temporary)" bar is a stand-in; Stage 3 replaces it with real login and removes `tempListAllForSwitcher`.
+- Now unused and safe to delete: old BranchesTable/TeamsTable/UsersTable components, their 3 CSS files, and lib/branchShape.js, teamShape.js, userShape.js.
+- Not built yet: /branches/settings, /users/roles, /users/permissions.

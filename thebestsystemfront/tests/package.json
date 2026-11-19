@@ -1,0 +1,1 @@
+{ "name": "org-tests", "private": true, "type": "module", "scripts": { "test": "node run-tests.mjs" }, "devDependencies": { "fake-indexeddb": "^6.0.0" } }

@@ -4,3 +4,15 @@ there is transferring data from dataset and general tables to general tables onl
 in general tables also default and extra columns of that general table will be displayed, and there is datasettable type filter when user choose a type the extra columns of this dataset table appears
 you might have a question what if user transferred data from general to general table -> in this case the extra columns data added from first general table will be ignored will not be displayed. what will be displayed only will be extra data of the dataset table type of this row 
 here you might have a question what if i want extra data that appears in general table to appear also in other general table when row transferred to ? answer is : that case means that you should make this col as default col applied on all tables so it will appear in all tables
+-----------------------------------------------
+in my imagination we should have 5 types of users director - branch admin - team admin - (high order) agent - agent 
+teams must belong to a specific branch , agents and high order agents should belong to a team (tables should be attached to a team too so team admin and lower can only see their team data, branch can only see branch teams data, director can see all branches data)
+director can make branches, teams and all types of users and can change users ranks 
+and also branch admin and team admin but branch admin or team admin can make and edit the ones with lower ranks of him
+director (can see&edit all tables&columns - export all data - add data to any table - control authorities of agents )  
+branch admin (can see&edit all tables&columns - export all data - add data to any table - control authorities of agents )  in his branch only
+team admin (can see&edit all tables&columns - export all data - add data to any table - control authorities of agents )  in her team only
+super agent (can see&edit all tables&columns )  in her team only
+agent (can see all tables&columns - admin can prevent seeing or editing) can edit what admin choose to edit only 
+admin can apply general one setting(like edit on specific col) for all agents and can do it for one agent only (think what will happen when general setting (like open edit on col for all agents ) conflicts with already exist setting (specific agent cant edit this col)-> my opinion is : override the old setting)
+for users registeration since it is internal system. director, branch, team admin can make users by username, password and can edit their credentials and can delete users. agents can only login 

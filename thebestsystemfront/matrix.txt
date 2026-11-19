@@ -1,0 +1,13 @@
+Proposed permission matrix (please correct it)
+	Director	Branch admin	Team admin	Super agent	Agent
+Scope	all	his branch	her team	her team	her team
+Manage branches / teams	all	teams in his branch?	no	no	no
+Manage users	all ranks	below him	below her	no	no
+See tables and columns	all	all	all	all	per admin’s settings
+Edit cell values	all	all	all	all	only what admin allows
+Import (add data)	yes	yes	yes	?	no
+Export	yes	yes	yes	?	no
+Bulk assign agents	yes	yes	yes	?	no
+Transfer rows	yes	yes	yes	?	?
+Control agent permissions	yes	yes	yes	no	no
+Edit table structure (Setup)	yes	?	?	no	no
