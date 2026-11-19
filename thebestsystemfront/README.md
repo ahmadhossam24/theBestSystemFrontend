@@ -1,10 +1,8 @@
-# Users Stage 2 — Branches, Teams, Users pages
-
-Copy the `app/` folder over your project (merge). New/changed: `first-run`, `branches/*`, `teams/*`, `users/*`, `components/org/*`, `lib/org/{session,demoSeed,orgService}.js`.
-
-- Open the app on **localhost or https** (password hashing needs a secure context).
-- Clear old browser storage once. First visit goes to /first-run: create the director, optionally load the demo organisation (password `demo1234`).
-- Pages: Branches (all/deleted/add), Teams (all/deleted/add/members), Users (all/deleted). Actions follow the role rules.
-- The "Switch user (temporary)" bar is a stand-in; Stage 3 replaces it with real login and removes `tempListAllForSwitcher`.
-- Now unused and safe to delete: old BranchesTable/TeamsTable/UsersTable components, their 3 CSS files, and lib/branchShape.js, teamShape.js, userShape.js.
-- Not built yet: /branches/settings, /users/roles, /users/permissions.
+# Users Stage 3 — login, guards, role-based sidebar, scope picker
+Merge `app/` over your project (replaces layout.js, page.js, components/sidebar.jsx, OrgGate, orgService.js).
+- /login (username not case-sensitive, ?next= honoured). Signed out -> every page redirects to /login; no director yet -> /first-run.
+- The temporary switch-user bar and `tempListAllForSwitcher` are gone. Sign out is in the sidebar.
+- Sidebar hides what a role can't open (Branches: director/branch admin; Users, Setup Table, Audit Log: admins). Typing a blocked URL shows "No access".
+- Scope picker (sidebar): director = Branch > Team; branch admin = Team of his branch; others = fixed own team. Remembered per user. The sidebar's table list still shows all tables until Stage 4 makes tables per-team.
+- Unbuilt pages (Permissions, Dashboard, Audit Log) still point at placeholders.
+- Demo accounts: password demo1234 (open on localhost/https).

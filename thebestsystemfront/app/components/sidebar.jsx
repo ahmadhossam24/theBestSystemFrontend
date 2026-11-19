@@ -27,13 +27,20 @@ import {
 import { BsWrenchAdjustable } from "react-icons/bs";
 import "./sidebar.css";
 import { useTables } from "../setup-table/hooks/useTables";
+import { isAdminRole } from "../lib/org/roles.js";
+import { useSession } from "../lib/org/session.js";
+import { useScope } from "../lib/org/scope.js";
+import ScopePicker from "./org/ScopePicker.jsx";
+import { RoleBadge } from "./org/ui.jsx";
 
 // The "Data" menu is GENERATED from the tables made on the Setup Table page:
 //   Data
 //     Datasets  -> one entry per dataset table
 //     <general table>, <general table>, ...
 // Everything else is fixed.
-function buildSections(tables, loaded) {
+function buildSections(tables, loaded, role) {
+  const admin = isAdminRole(role);
+  const top = role === "director" || role === "branchAdmin";
   const datasets = tables.filter((t) => t.tableType === "dataset");
   const generals = tables.filter((t) => t.tableType === "general");
   const link = (t, icon) => ({ id: `table-${t.id}`, label: t.name, icon, path: `/tables/${t.id}` });
@@ -54,7 +61,7 @@ function buildSections(tables, loaded) {
     dataItems.push({ id: "general-none", label: "No general tables yet", icon: FaList, path: "/setup-table" });
   }
 
-  return [
+  const all = [
     { id: "dashboard", label: "Dashboard", icon: FaTachometerAlt, hasSubmenu: false, path: "/xxx" },
     {
       id: "branches",
@@ -64,8 +71,7 @@ function buildSections(tables, loaded) {
       submenuItems: [
         { id: "branches-all", label: "All Branches", icon: FaList, path: "/branches/all" },
         { id: "branches-deleted", label: "Deleted Branches", icon: FaList, path: "/branches/deleted" },
-        { id: "branches-add", label: "Add Branch", icon: FaPlusCircle, path: "/branches/add" },
-        { id: "branches-settings", label: "Branch Settings", icon: FaSlidersH, path: "/branches/settings" },
+        ...(role === "director" ? [{ id: "branches-add", label: "Add Branch", icon: FaPlusCircle, path: "/branches/add" }] : []),
       ],
     },
     {
@@ -75,8 +81,8 @@ function buildSections(tables, loaded) {
       hasSubmenu: true,
       submenuItems: [
         { id: "teams-all", label: "All Teams", icon: FaUsers, path: "/teams/all" },
-        { id: "teams-deleted", label: "Deleted Teams", icon: FaUsers, path: "/teams/deleted" },
-        { id: "teams-create", label: "Create Team", icon: FaUserPlus, path: "/teams/add" },
+        ...(admin ? [{ id: "teams-deleted", label: "Deleted Teams", icon: FaUsers, path: "/teams/deleted" }] : []),
+        ...(top ? [{ id: "teams-create", label: "Create Team", icon: FaUserPlus, path: "/teams/add" }] : []),
         { id: "teams-members", label: "Team Members", icon: FaUser, path: "/teams/members" },
       ],
     },
@@ -88,7 +94,6 @@ function buildSections(tables, loaded) {
       submenuItems: [
         { id: "users-all", label: "All Users", icon: FaUsers, path: "/users/all" },
         { id: "users-deleted", label: "Deleted Users", icon: FaUsers, path: "/users/deleted" },
-        { id: "users-roles", label: "Roles", icon: FaShieldAlt, path: "/users/roles" },
         { id: "users-permissions", label: "Permissions", icon: FaLock, path: "/users/permissions" },
       ],
     },
@@ -118,6 +123,11 @@ function buildSections(tables, loaded) {
     },
     { id: "auditlog", label: "Audit Log", icon: FaHistory, hasSubmenu: false, path: "/xxx" },
   ];
+  // Hide whole sections the role can't open.
+  const hidden = new Set();
+  if (!top) hidden.add("branches");
+  if (!admin) ["users", "setupTables", "auditlog"].forEach((id) => hidden.add(id));
+  return all.filter((x) => !hidden.has(x.id));
 }
 
 // A table's own pages (/tables/<id> and /tables/<id>/history/<row>) all light up its entry.
@@ -126,10 +136,12 @@ const pathMatches = (pathname, path) => !!path && (pathname === path || pathname
 const itemActive = (pathname, item) =>
   pathMatches(pathname, item.path) || !!item.submenuItems?.some((s) => itemActive(pathname, s));
 
-export default function Sidebar() {
+export default function Sidebar({ user }) {
   const pathname = usePathname();
   const { tables, loaded } = useTables();
-  const sections = useMemo(() => buildSections(tables, loaded), [tables, loaded]);
+  const { signOut } = useSession();
+  const { branches, teams, scope, choose } = useScope(user);
+  const sections = useMemo(() => buildSections(tables, loaded, user.role), [tables, loaded, user.role]);
   const [expandedSections, setExpandedSections] = useState({});
 
   const toggleSection = (sectionId) => {
@@ -153,6 +165,18 @@ export default function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-brand">
         <h1>The Best</h1>
+      </div>
+      <div className="border-b border-slate-100 pb-2" data-testid="actor-bar">
+        <div className="px-4 pt-1 text-sm">
+          <strong data-testid="actor-name" className="text-slate-700">{user.displayName}</strong>{" "}
+          <RoleBadge role={user.role} />
+        </div>
+        <ScopePicker user={user} scope={scope} branches={branches} teams={teams} choose={choose} />
+        <div className="px-4">
+          <button onClick={signOut} data-testid="sign-out" className="text-xs font-medium text-slate-500 hover:text-red-600 hover:underline">
+            Sign out
+          </button>
+        </div>
       </div>
       <nav className="sidebar-nav">
         <ul className="nav-list">

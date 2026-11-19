@@ -139,14 +139,6 @@ export function createOrgService(repo, opts = {}) {
       return u && !u.deletedAt ? publicUser(u) : null;
     },
 
-    // TEMPORARY (removed when real sign-in arrives in the next stage): lets the "switch user"
-    // bar list every active account so the pages can be tried as each role. Never returns secrets.
-    async tempListAllForSwitcher() {
-      const org = await loadOrg();
-      return org.users.filter((u) => !u.deletedAt).map((u) => ({ id: u.id, username: u.username, name: nameOf(u), role: u.role, teamId: u.teamId ?? null }))
-        .sort((a, b) => RANK[b.role] - RANK[a.role] || a.name.localeCompare(b.name));
-    },
-
     // ------------------------------------------------------------------ branches
     async listBranches(actorId, { deleted = false } = {}) {
       const org = await loadOrg();

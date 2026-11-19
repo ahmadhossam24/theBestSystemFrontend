@@ -1,0 +1,17 @@
+import { createMemoryRepo } from "./org/memoryRepo.js";
+import { createOrgService } from "./org/orgService.js";
+import { seedDemoOrg, DEMO_PASSWORD } from "./org/demoSeed.js";
+let pass = 0, fail = 0; const ok = (n, c, x = "") => { c ? pass++ : (fail++, console.log("FAIL " + n, x)); };
+const svc = createOrgService(createMemoryRepo());
+const d = (await svc.createFirstDirector({ username: "boss", password: "secret1" })).value;
+const seed = await seedDemoOrg(svc, d.id);
+ok("11 accounts", seed.accounts.length === 11);
+ok("2 branches, 3 teams", (await svc.listBranches(d.id)).value.length === 2 && (await svc.listTeams(d.id)).value.length === 3);
+for (const a of seed.accounts) ok("login " + a.username, (await svc.authenticate(a.username, DEMO_PASSWORD)).ok);
+const sw = (await svc.listUsers(d.id)).value;
+ok("director lists everyone, no secrets", sw.length === 12 && !JSON.stringify(sw).match(/pbkdf2|hash|salt/));
+ok("temp switcher method is gone", svc.tempListAllForSwitcher === undefined);
+ok("roles all present", new Set(sw.map((u) => u.role)).size === 5);
+const ba = (await svc.authenticate("ba.cairo", DEMO_PASSWORD)).value;
+ok("Cairo admin sees 2 teams, 1 branch", (await svc.listTeams(ba.id)).value.length === 2 && (await svc.listBranches(ba.id)).value.length === 1);
+console.log(`${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
