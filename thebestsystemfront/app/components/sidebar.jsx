@@ -53,12 +53,12 @@ function buildSections(tables, loaded, role) {
       hasSubmenu: true,
       submenuItems: datasets.length
         ? datasets.map((t) => link(t, FaTable))
-        : [{ id: "datasets-none", label: loaded ? "No datasets yet" : "Loading…", icon: FaTable, path: loaded ? "/setup-table" : undefined }],
+        : [{ id: "datasets-none", label: loaded ? "No datasets yet" : "Loading…", icon: FaTable, path: loaded && admin ? "/setup-table" : undefined }],
     },
     ...generals.map((t) => link(t, FaList)),
   ];
   if (loaded && generals.length === 0) {
-    dataItems.push({ id: "general-none", label: "No general tables yet", icon: FaList, path: "/setup-table" });
+    dataItems.push({ id: "general-none", label: "No general tables yet", icon: FaList, path: admin ? "/setup-table" : undefined });
   }
 
   const all = [
@@ -138,9 +138,9 @@ const itemActive = (pathname, item) =>
 
 export default function Sidebar({ user }) {
   const pathname = usePathname();
-  const { tables, loaded } = useTables();
   const { signOut } = useSession();
   const { branches, teams, scope, choose } = useScope(user);
+  const { tables, loaded } = useTables(scope.teamId || null); // the chosen team's tables only
   const sections = useMemo(() => buildSections(tables, loaded, user.role), [tables, loaded, user.role]);
   const [expandedSections, setExpandedSections] = useState({});
 

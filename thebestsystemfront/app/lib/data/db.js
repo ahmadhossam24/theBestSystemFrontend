@@ -143,3 +143,30 @@ export async function getHistory(rowId) {
   const events = await wrap(tx.objectStore("history").index("byRow").getAll(rowId));
   return events.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : 1));
 }
+
+// When an agent's username changes, rows assigned to the old name follow it (one transaction).
+// Usernames are unique, so matching on the old name can only ever hit that person's rows.
+// Returns how many rows were updated.
+export async function renameAssignee(oldName, newName) {
+  if (!oldName || !newName || oldName === newName) return 0;
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("rows", "readwrite");
+    const store = tx.objectStore("rows");
+    let n = 0;
+    const req = store.openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return;
+      const row = cur.value;
+      if (row.values && row.values.agent === oldName) {
+        cur.update({ ...row, values: { ...row.values, agent: newName }, updatedAt: new Date().toISOString() });
+        n += 1;
+      }
+      cur.continue();
+    };
+    tx.oncomplete = () => resolve(n);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}

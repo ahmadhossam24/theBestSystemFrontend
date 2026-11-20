@@ -5,12 +5,19 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTables } from "../../../../setup-table/hooks/useTables";
 import { getHistory, getRow } from "../../../../lib/data/db";
+import { useSession } from "../../../../lib/org/session.js";
+import { useScope } from "../../../../lib/org/scope.js";
+import { canReachTeam } from "../../../../lib/data/dataRules";
 import { describeEvent, formatStamp } from "../../../../lib/data/history";
 
 export default function RowHistoryPage() {
   const { tableId, rowId } = useParams();
   const { tables, loaded } = useTables();
-  const table = tables.find((t) => t.id === tableId);
+  const { user } = useSession();
+  const { teams, ready: teamsReady } = useScope(user);
+  const found = tables.find((t) => t.id === tableId);
+  const allowed = !!found && teamsReady && canReachTeam(teams, found.teamId);
+  const table = allowed ? found : undefined;
 
   const [state, setState] = useState({ status: "loading", row: null, events: [] });
 
@@ -29,8 +36,11 @@ export default function RowHistoryPage() {
     };
   }, [rowId]);
 
-  const backHref = table ? `/tables/${table.id}` : "/setup-table";
-  const { row, events } = state;
+  const backHref = table ? `/tables/${table.id}` : "/";
+  const { row: rawRow, events } = state;
+  // the row must belong to this table's own team (a URL can't be used to peek at another team's row)
+  const row =
+    table && rawRow && [rawRow.datasetTableId, rawRow.generalTableId].some((id) => id && tables.find((t) => t.id === id)?.teamId === table.teamId) ? rawRow : null;
 
   return (
     <div>
@@ -39,17 +49,18 @@ export default function RowHistoryPage() {
       </Link>
 
       <h1 className="text-xl font-semibold text-slate-800">Transaction history</h1>
-      {row && (
+      {table && row && (
         <p className="mb-6 mt-1 text-sm text-slate-400">
           {[row.values?.landline, row.values?.name].filter(Boolean).join(" · ") || `Row ${rowId}`}
         </p>
       )}
 
-      {(state.status === "loading" || !loaded) && <p className="mt-4 text-sm text-slate-400">Loading…</p>}
+      {loaded && teamsReady && !table && <p className="mt-4 text-sm text-slate-400" data-testid="table-missing">This table isn&apos;t available to you.</p>}
+      {(state.status === "loading" || !loaded || !teamsReady) && <p className="mt-4 text-sm text-slate-400">Loading…</p>}
       {state.status === "error" && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{state.message}</p>}
-      {state.status === "ready" && !row && <p className="mt-4 text-sm text-slate-400">This row no longer exists.</p>}
+      {table && state.status === "ready" && !row && <p className="mt-4 text-sm text-slate-400">This row no longer exists.</p>}
 
-      {state.status === "ready" && row && (
+      {table && state.status === "ready" && row && (
         <ol className="relative border-l border-slate-200 pl-6">
           {events.map((e) => (
             <li key={e.id} className="mb-6 last:mb-0">

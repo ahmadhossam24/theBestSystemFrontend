@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { can } from "../../lib/org/permissions.js";
 import { ROLES, ROLE_LABELS, isAdminRole } from "../../lib/org/roles.js";
 import { useOrgSnapshot } from "./useOrgSnapshot.js";
+import { renameAssignee } from "../../lib/data/db.js";
 import { PasswordForm, UserForm } from "./forms.jsx";
 import { ConfirmModal, EmptyRow, Notice, PageHeader, RoleBadge, btnPrimary, fmtDate, inputCls, linkBtn, linkDanger, tableCls, tdCls, thCls } from "./ui.jsx";
 
@@ -158,6 +159,12 @@ export default function UsersView({ actor, mode = "active" }) {
             }
             const r = await s.mutate(form.kind === "edit" ? s.svc.updateUser(actor.id, form.user.id, payload) : s.svc.createUser(actor.id, payload));
             if (r.ok) {
+              // rows assigned to this person follow a username change
+              if (form.kind === "edit" && payload.username && payload.username !== form.user.username) {
+                try {
+                  await renameAssignee(form.user.username, r.value.username);
+                } catch {}
+              }
               setNotice(form.kind === "edit" ? `${r.value.displayName} updated.` : `${r.value.displayName} created.`);
               setForm(null);
             }

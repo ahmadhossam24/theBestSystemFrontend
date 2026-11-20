@@ -6,6 +6,8 @@ import { useTables } from "./hooks/useTables";
 import TableFormModal from "./components/TableFormModal";
 import DefaultColumnsModal from "./components/DefaultColumnsModal";
 import { countRowsForTable } from "../lib/data/db";
+import { useSession } from "../lib/org/session.js";
+import { useScope } from "../lib/org/scope.js";
 
 const TYPE_STYLES = {
   general: "bg-slate-100 text-slate-600",
@@ -20,7 +22,10 @@ const ORIGIN_STYLES = {
 };
 
 export default function SetupTablePage() {
-  const { tables, globals, loaded, saveTable, deleteTable, saveGlobalColumns } = useTables();
+  const { user } = useSession();
+  const { teams, scope } = useScope(user);
+  const team = teams.find((t) => t.id === scope.teamId);
+  const { tables, globals, loaded, saveTable, deleteTable, saveGlobalColumns } = useTables(scope.teamId || null);
   const [modal, setModal] = useState(null); // null | { kind: "table", table } | { kind: "defaults" }
   const [expandedId, setExpandedId] = useState(null);
 
@@ -74,18 +79,29 @@ export default function SetupTablePage() {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-800">Setup tables</h1>
-          <p className="text-sm text-slate-400">Define the tables the system will build. Saved to local storage.</p>
+          <p className="text-sm text-slate-400" data-testid="setup-scope">
+            {team ? (
+              <>
+                Tables of <strong className="text-slate-600">{team.name}</strong>
+                {team.branchName ? ` (${team.branchName})` : ""}. Every team has its own tables and default columns.
+              </>
+            ) : (
+              "Choose a team in the sidebar first."
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setModal({ kind: "defaults" })}
+            disabled={!team}
             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             Default columns{globals.columns.length > 0 && ` (${globals.columns.length})`}
           </button>
           <button
             onClick={() => setModal({ kind: "table", table: null })}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            disabled={!team}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"
           >
             + Add table
           </button>
@@ -180,7 +196,7 @@ export default function SetupTablePage() {
             {loaded && tables.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-400">
-                  No tables yet. Click &quot;Add table&quot; to create one.
+                  {team ? <>No tables in this team yet. Click &quot;Add table&quot; to create one.</> : "No team to show. Create a team first (Teams > Create Team)."}
                 </td>
               </tr>
             )}

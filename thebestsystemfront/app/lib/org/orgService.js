@@ -253,7 +253,7 @@ export function createOrgService(repo, opts = {}) {
       if (!team || team.deletedAt) return NOT_FOUND("Team");
       const members = org.users.filter((u) => u.teamId === id && !u.deletedAt).length;
       if (members) return fail("blocked", `This team still has ${members} user(s). Delete or move them first.`);
-      if (await teamHasData(id)) return fail("blocked", "This team still has tables with data. Remove them first.");
+      if (await teamHasData(id)) return fail("blocked", "This team still has tables with rows. Remove the rows first.");
       const next = { ...team, deletedAt: now(), updatedAt: now() };
       await repo.write([{ store: "teams", put: next }, log(actor, "team.delete", { type: "team", id, name: team.name }, { branchId: team.branchId, teamId: id })]);
       return ok(next);
@@ -292,7 +292,7 @@ export function createOrgService(repo, opts = {}) {
       return ok(
         org.users
           .filter((u) => u.teamId === teamId && !u.deletedAt && (u.role === "agent" || u.role === "superAgent"))
-          .map((u) => ({ id: u.id, name: nameOf(u), role: u.role }))
+          .map((u) => ({ id: u.id, name: nameOf(u), username: u.username, role: u.role }))
           .sort(byName)
       );
     },

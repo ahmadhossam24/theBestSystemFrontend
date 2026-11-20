@@ -13,7 +13,7 @@
 //      createdAt, updatedAt
 //    }
 //
-// 2) GLOBAL_STORAGE_KEY -> the default columns the USER added, shared by ALL tables
+// 2) GLOBAL_STORAGE_KEY -> the default columns the USER added, shared by all tables OF ONE TEAM (see byTeam below)
 //    {
 //      columns: [ { key, label, type, options, fixed: true, origin: "global" } ],
 //      retiredKeys: ["oldKey"]             // keys of deleted shared columns
@@ -32,8 +32,12 @@
 // `key` is a stable id: renaming changes only `label`, so stored rows stay attached.
 // ---------------------------------------------------------------------------
 
-export const STORAGE_KEY = "setup-tables-v1";
-export const GLOBAL_STORAGE_KEY = "setup-default-columns-v1";
+export const STORAGE_KEY = "setup-tables-v2";
+export const GLOBAL_STORAGE_KEY = "setup-default-columns-v2";
+
+// TEAMS (Stage 4): every table belongs to exactly ONE team (`teamId`), and the default columns are kept
+// PER TEAM:   setup-default-columns-v2 = { byTeam: { [teamId]: { columns, retiredKeys } } }
+// Table names only have to be unique inside their team.
 
 export const TABLE_TYPES = [
   { value: "general", label: "General table" },
@@ -47,9 +51,9 @@ export const COLUMN_TYPES = [
 ];
 
 // Options of the built-in choices columns.
-// PLACEHOLDERS for now: agents will come from the signed-in users later, so only
-// this one list needs to change then. (Feedback: edit the list here if you add one.)
-export const AGENT_OPTIONS = ["Nour", "Sara", "Emad"];
+// The Agent column's options are the agents + super agents of the table's TEAM. They are filled in
+// when a table is shown (lib/data/agents.js), so the stored list here is empty.
+export const AGENT_OPTIONS = [];
 export const FEEDBACK_OPTIONS = ["Accept", "No Answer", "Next time"];
 
 // Present in every table, can't be edited or deleted by the user.
@@ -141,6 +145,7 @@ export function normalizeTable(t, globals = EMPTY_GLOBALS) {
   const now = new Date().toISOString();
   return {
     id: t?.id || makeTableId(),
+    teamId: t?.teamId ?? null,
     name: String(t?.name ?? "").trim(),
     tableType,
     columns: [...getFixedColumns(tableType), ...globals.columns.map((c) => ({ ...c, options: [...c.options] })), ...custom],
@@ -226,7 +231,7 @@ export function validateGlobalDraft(cols, allTables) {
 // ------------------------------ building ----------------------------------
 
 // Turns a (validated) table draft into the record that gets stored.
-export function buildTable(draft, existing, globals = EMPTY_GLOBALS) {
+export function buildTable(draft, existing, globals = EMPTY_GLOBALS, teamId = null) {
   const now = new Date().toISOString();
 
   // A deleted column's key goes into `retiredKeys` and is never handed out
@@ -253,6 +258,7 @@ export function buildTable(draft, existing, globals = EMPTY_GLOBALS) {
 
   return {
     id: existing?.id || makeTableId(),
+    teamId: existing?.teamId ?? teamId, // a table never changes team
     name: draft.name.trim(),
     tableType: draft.tableType,
     columns: [...getFixedColumns(draft.tableType), ...globals.columns.map((c) => ({ ...c, options: [...c.options] })), ...custom],

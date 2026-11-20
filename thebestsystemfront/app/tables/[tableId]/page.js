@@ -10,7 +10,10 @@ import { activeFilters, buildFilterOptions, filterRows, filterableColumns } from
 import { makeEditEvent } from "../../lib/data/history";
 import { bulkColumns, planBulkEdit } from "../../lib/data/bulk";
 import { planTransfer, transferTargets } from "../../lib/data/transfer";
-import { useCurrentUser } from "../../lib/data/currentUser";
+import { useSession } from "../../lib/org/session.js";
+import { useScope } from "../../lib/org/scope.js";
+import { tableCaps, canReachTeam } from "../../lib/data/dataRules";
+import { useTeamAgents, withAgentOptions } from "../../lib/data/agents";
 import { countSampleRows, deleteSampleRows, putRows, saveRowWithEvent } from "../../lib/data/db";
 import { buildImportedRows } from "../../lib/data/xlsxImport";
 import EditableCell from "../../components/EditableCell";
@@ -31,11 +34,20 @@ const inputCls =
 
 export default function TablePage() {
   const { tableId } = useParams();
-  const { tables, loaded } = useTables();
-  const table = useMemo(() => tables.find((t) => t.id === tableId), [tables, tableId]);
+  const { tables: everyTable, loaded } = useTables(); // all teams: looked up by id, access checked below
+  const { user } = useSession();
+  const { teams, ready: teamsReady } = useScope(user);
+  const found = useMemo(() => everyTable.find((t) => t.id === tableId), [everyTable, tableId]);
+  // Only people who can see the table's team may open it (otherwise it looks like it doesn't exist).
+  const allowed = !!found && teamsReady && canReachTeam(teams, found.teamId);
+  const table = allowed ? found : undefined;
+  // Everything below (dataset types, transfers, columns) works inside the table's own team.
+  const tables = useMemo(() => (table ? everyTable.filter((t) => t.teamId === table.teamId) : []), [everyTable, table]);
+  const caps = tableCaps(user?.role);
+  const userName = user?.displayName || "";
+  const agents = useTeamAgents(user?.id, table?.teamId);
 
   const { rows, setRows, loading, error, reload } = useTableRows(table);
-  const { name: userName, setName: setUserName } = useCurrentUser();
 
   const [datasetFilter, setDatasetFilter] = useState(""); // "" = all, NO_DATASET, or a dataset table id
   const [search, setSearch] = useState("");
@@ -76,9 +88,9 @@ export default function TablePage() {
     }
   }, [datasetFilter, datasetTables]);
 
-  const columns = useMemo(() => (table ? resolveColumns(table, tables, datasetFilter) : []), [table, tables, datasetFilter]);
+  const columns = useMemo(() => (table ? withAgentOptions(resolveColumns(table, tables, datasetFilter), agents) : []), [table, tables, datasetFilter, agents]);
   // Excel headers are matched against the table's OWN columns (a direct upload has no dataset type).
-  const importColumns = useMemo(() => (table ? resolveColumns(table, tables, null) : []), [table, tables]);
+  const importColumns = useMemo(() => (table ? withAgentOptions(resolveColumns(table, tables, null), agents) : []), [table, tables, agents]);
   const filterCols = useMemo(() => filterableColumns(columns), [columns]);
 
   // rows of the chosen dataset type (before search / column filters)
@@ -116,6 +128,7 @@ export default function TablePage() {
   // Update the screen immediately, then save row + history event together.
   // If saving fails, re-read from the database so the screen shows the truth.
   const editCell = async (row, col, value) => {
+    if (!caps.editCells) return;
     const old = getCellValue(row, col, tables);
     if (String(old) === String(value)) return;
     const next = applyCellEdit(row, col, value);
@@ -132,6 +145,7 @@ export default function TablePage() {
 
   // ---- Excel import -------------------------------------------------------
   const importRecords = async ({ records, fileName }) => {
+    if (!caps.import) return;
     const { rows: fresh, events, stamp } = buildImportedRows(table, records, fileName, userName);
     await putRows(fresh, events); // rows + history in one transaction: all or nothing
     await reload();
@@ -178,6 +192,7 @@ export default function TablePage() {
   };
 
   const applyBulk = async (column, value) => {
+    if (!caps.bulkEdit) return;
     setBulkBusy(true);
     try {
       const plan = planBulkEdit({ rows, ids: selected, column, value, by: userName, table, tables });
@@ -204,6 +219,7 @@ export default function TablePage() {
   const targets = useMemo(() => (table ? transferTargets(tables, table) : []), [tables, table]);
 
   const transferSelected = async (targetId) => {
+    if (!caps.transfer) return;
     const target = tables.find((t) => t.id === targetId && t.tableType === "general");
     if (!target) return;
     setBulkBusy(true);
@@ -236,21 +252,22 @@ export default function TablePage() {
     setDatasetFilter("");
   };
 
-  if (!loaded) return <p className="text-sm text-slate-400">Loading…</p>;
+  if (!loaded || !user || !teamsReady) return <p className="text-sm text-slate-400">Loading…</p>;
 
   if (!table) {
     return (
       <div>
         <h1 className="text-xl font-semibold text-slate-800">Table not found</h1>
-        <p className="mt-1 text-sm text-slate-400">It may have been deleted.</p>
-        <Link href="/setup-table" className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline">
-          Back to Setup tables
+        <p className="mt-1 text-sm text-slate-400" data-testid="table-missing">It may have been deleted, or it belongs to a team you can't open.</p>
+        <Link href="/" className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline">
+          Back home
         </Link>
       </div>
     );
   }
 
   const isGeneral = table.tableType === "general";
+  const team = teams.find((t) => t.id === table.teamId);
 
   return (
     <div>
@@ -268,22 +285,15 @@ export default function TablePage() {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <ImportButton table={table} columns={importColumns} onConfirm={importRecords} disabled={loading} />
+            {caps.import && <ImportButton table={table} columns={importColumns} onConfirm={importRecords} disabled={loading} />}
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} rows
             </span>
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-slate-400" title="Placeholder until sign-in exists. Written into each change's history.">
-            Acting as
-            <input
-              aria-label="Acting as"
-              defaultValue={userName}
-              key={userName}
-              onBlur={(e) => setUserName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-              className="w-28 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-300"
-            />
-          </label>
+          <span className="text-xs text-slate-400" data-testid="table-team">
+            Team: {team?.name || "—"}
+            {caps.editCells ? "" : " · view only (transfer allowed)"}
+          </span>
         </div>
       </div>
 
@@ -365,13 +375,13 @@ export default function TablePage() {
 
       {selected.size > 0 && (
         <BulkEditBar
-          columns={bulkCols}
+          columns={caps.bulkEdit ? bulkCols : []}
           selected={selected.size}
           totalMatching={visibleRows.length}
           onSelectAll={selectAllMatching}
           onClear={clearSelection}
           onApply={applyBulk}
-          targets={targets}
+          targets={caps.transfer ? targets : []}
           onTransfer={transferSelected}
           busy={bulkBusy}
         />
@@ -415,9 +425,9 @@ export default function TablePage() {
                 </td>
                 {columns.map((c) => {
                   const v = getCellValue(row, c, tables);
-                  if (c.readOnly) {
+                  if (c.readOnly || !caps.editCells) {
                     return (
-                      <td key={c.cellId} className="whitespace-nowrap px-3 py-2 text-sm text-slate-500" title="Set by the system">
+                      <td key={c.cellId} className="whitespace-nowrap px-3 py-2 text-sm text-slate-500" title={c.readOnly ? "Set by the system" : "View only"}>
                         {v === "" ? <span className="text-slate-300">—</span> : v}
                       </td>
                     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   STORAGE_KEY,
   GLOBAL_STORAGE_KEY,
@@ -30,23 +30,32 @@ function writeJson(key, value) {
   }
 }
 
-// Reads both keys and rebuilds every table against the current definitions.
+// Reads both keys and rebuilds every table against ITS TEAM's current default columns.
 function readAll() {
-  const globals = normalizeGlobals(readJson(GLOBAL_STORAGE_KEY));
+  const raw = readJson(GLOBAL_STORAGE_KEY);
+  const globalsByTeam = {};
+  Object.entries(raw?.byTeam || {}).forEach(([teamId, g]) => {
+    globalsByTeam[teamId] = normalizeGlobals(g);
+  });
   const rawTables = readJson(STORAGE_KEY);
-  const tables = Array.isArray(rawTables) ? rawTables.map((t) => normalizeTable(t, globals)) : [];
-  return { globals, tables };
+  const tables = (Array.isArray(rawTables) ? rawTables : [])
+    .filter((t) => t && t.teamId) // a table without a team can't be reached by anyone
+    .map((t) => normalizeTable(t, globalsByTeam[t.teamId] || EMPTY_GLOBALS));
+  return { globalsByTeam, tables };
 }
 
 /**
- * Your two "database tables":
- *   - tables   (STORAGE_KEY)         one record per table
- *   - globals  (GLOBAL_STORAGE_KEY)  default columns shared by every table
- * localStorage is the source of truth: every change is computed from the latest
- * data, written to localStorage, then mirrored to state.
+ * Your two "database tables" (localStorage is the source of truth):
+ *   - tables   (STORAGE_KEY)         one record per table, each with its `teamId`
+ *   - globals  (GLOBAL_STORAGE_KEY)  default columns, kept per team
+ *
+ * useTables(teamId):
+ *   a team id -> only that team's tables + that team's default columns (Setup page, sidebar)
+ *   null      -> nothing (no team chosen yet)
+ *   undefined -> every table of every team (lookups by id; callers must check access themselves)
  */
-export function useTables() {
-  const [state, setState] = useState({ tables: [], globals: EMPTY_GLOBALS });
+export function useTables(teamId) {
+  const [state, setState] = useState({ tables: [], globalsByTeam: {} });
   const [loaded, setLoaded] = useState(false);
   const ref = useRef(state);
 
@@ -56,17 +65,12 @@ export function useTables() {
     ref.current = initial;
     setState(initial);
     setLoaded(true);
-
-    // Write the rebuilt records back, so anything reading localStorage directly
-    // later sees the complete, current column lists (e.g. tables saved before
-    // a new default column existed).
-    if (JSON.stringify(readJson(STORAGE_KEY)) !== JSON.stringify(initial.tables) && localStorage.getItem(STORAGE_KEY)) {
+    if (localStorage.getItem(STORAGE_KEY) && JSON.stringify(readJson(STORAGE_KEY)) !== JSON.stringify(initial.tables)) {
       writeJson(STORAGE_KEY, initial.tables);
     }
   }, []);
 
-  // Keep other open tabs ("storage") and other components in THIS tab (e.g. the sidebar,
-  // which has its own copy of this hook) in sync.
+  // Keep other open tabs ("storage") and other components in THIS tab (e.g. the sidebar) in sync.
   useEffect(() => {
     const reread = () => {
       const next = readAll();
@@ -86,53 +90,59 @@ export function useTables() {
 
   const commit = useCallback((next) => {
     ref.current = next;
-    writeJson(GLOBAL_STORAGE_KEY, next.globals);
+    writeJson(GLOBAL_STORAGE_KEY, { byTeam: next.globalsByTeam });
     writeJson(STORAGE_KEY, next.tables);
     setState(next);
     window.dispatchEvent(new Event(CHANGED_EVENT));
   }, []);
 
-  // editingId = null -> add; otherwise update that table.
+  const globalsOf = (cur, id) => cur.globalsByTeam[id] || EMPTY_GLOBALS;
+
+  // editingId = null -> add (to `teamId`); otherwise update that table. A table never changes team.
   const saveTable = useCallback(
     (draft, editingId) => {
-      const { tables, globals } = ref.current;
+      if (!teamId && !editingId) return;
+      const cur = ref.current;
       if (editingId) {
-        const existing = tables.find((t) => t.id === editingId);
+        const existing = cur.tables.find((t) => t.id === editingId);
         if (!existing) return;
-        const updated = buildTable(draft, existing, globals);
-        commit({ globals, tables: tables.map((t) => (t.id === editingId ? updated : t)) });
+        const updated = buildTable(draft, existing, globalsOf(cur, existing.teamId), existing.teamId);
+        commit({ ...cur, tables: cur.tables.map((t) => (t.id === editingId ? updated : t)) });
       } else {
-        commit({ globals, tables: [...tables, buildTable(draft, null, globals)] });
+        commit({ ...cur, tables: [...cur.tables, buildTable(draft, null, globalsOf(cur, teamId), teamId)] });
       }
     },
-    [commit]
+    [commit, teamId]
   );
 
   const deleteTable = useCallback(
     (id) => {
-      const { tables, globals } = ref.current;
-      commit({ globals, tables: tables.filter((t) => t.id !== id) });
+      const cur = ref.current;
+      commit({ ...cur, tables: cur.tables.filter((t) => t.id !== id) });
     },
     [commit]
   );
 
-  // Replaces the whole list of shared default columns, then rebuilds EVERY
-  // table so each one gets/loses the changed columns.
+  // Replaces the shared default columns OF THIS TEAM, then rebuilds that team's tables only.
   const saveGlobalColumns = useCallback(
     (draftCols) => {
-      const { tables, globals } = ref.current;
-      const nextGlobals = buildGlobals(draftCols, globals, tables);
-      commit({ globals: nextGlobals, tables: tables.map((t) => normalizeTable(t, nextGlobals)) });
+      if (!teamId) return;
+      const cur = ref.current;
+      const mine = cur.tables.filter((t) => t.teamId === teamId);
+      const nextGlobals = buildGlobals(draftCols, globalsOf(cur, teamId), mine);
+      commit({
+        globalsByTeam: { ...cur.globalsByTeam, [teamId]: nextGlobals },
+        tables: cur.tables.map((t) => (t.teamId === teamId ? normalizeTable(t, nextGlobals) : t)),
+      });
     },
-    [commit]
+    [commit, teamId]
   );
 
-  return {
-    tables: state.tables,
-    globals: state.globals,
-    loaded,
-    saveTable,
-    deleteTable,
-    saveGlobalColumns,
-  };
+  const tables = useMemo(
+    () => (teamId === undefined ? state.tables : teamId === null ? [] : state.tables.filter((t) => t.teamId === teamId)),
+    [state.tables, teamId]
+  );
+  const globals = teamId ? state.globalsByTeam[teamId] || EMPTY_GLOBALS : EMPTY_GLOBALS;
+
+  return { tables, globals, loaded, saveTable, deleteTable, saveGlobalColumns };
 }
