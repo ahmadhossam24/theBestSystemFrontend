@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { getOrgService } from "../lib/org/orgClient.js";
 import { setSessionUser } from "../lib/org/session.js";
 import { DEMO_PASSWORD, seedDemoOrg } from "../lib/org/demoSeed.js";
+import { seedDemoData } from "../lib/org/demoData.js";
 import { Field, Notice, btnPrimary, inputCls } from "../components/org/ui.jsx";
 
 export default function FirstRunPage() {
   const router = useRouter();
   const [state, setState] = useState("checking"); // checking | form | done
-  const [f, setF] = useState({ displayName: "", username: "", password: "", confirm: "", demo: false });
+  const [f, setF] = useState({ displayName: "", username: "", password: "", confirm: "", demo: false, data: true });
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +40,11 @@ export default function FirstRunPage() {
         return;
       }
       setSessionUser(r.value.id);
-      if (f.demo) setSeeded(await seedDemoOrg(svc, r.value.id));
+      if (f.demo) {
+        const org = await seedDemoOrg(svc, r.value.id);
+        const data = f.data ? await seedDemoData(org, r.value.displayName) : null;
+        setSeeded({ ...org, data });
+      }
       setState("done");
       if (!f.demo) router.replace("/");
     } catch (err) {
@@ -58,6 +63,11 @@ export default function FirstRunPage() {
         <p className="mb-4 mt-1 text-sm text-slate-500">
           You are signed in as the director. Every demo account below uses the password <strong data-testid="demo-password">{DEMO_PASSWORD}</strong>.
         </p>
+        {seeded.data && (
+          <p className="mb-3 text-sm text-slate-500" data-testid="demo-data">
+            Sample data: {seeded.data.map((d) => `${d.team} – ${d.tables} tables, ${d.rows} rows`).join(" · ")}.
+          </p>
+        )}
         <ul className="mb-5 divide-y divide-slate-100 rounded-xl border border-slate-100 text-sm">
           {seeded.accounts.map((a) => (
             <li key={a.username} className="flex justify-between px-4 py-2">
@@ -97,9 +107,17 @@ export default function FirstRunPage() {
       <label className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
         <input type="checkbox" checked={f.demo} onChange={set("demo")} className="mt-0.5" data-testid="demo-checkbox" />
         <span>
-          Also load a demo organisation <span className="text-slate-400">(2 branches, 3 teams, 11 people of every role, password “{DEMO_PASSWORD}”)</span>
+          Also load a demo organisation <span className="text-slate-400">(2 branches, 3 teams, 11 people of every role; password “{DEMO_PASSWORD}”)</span>
         </span>
       </label>
+      {f.demo && (
+        <label className="-mt-2 ml-6 flex items-start gap-2 text-sm text-slate-600">
+          <input type="checkbox" checked={f.data} onChange={set("data")} className="mt-0.5" data-testid="demo-data-checkbox" />
+          <span>
+            …with sample tables, rows, history and agent permissions <span className="text-slate-400">(3 tables per team, 36 rows each)</span>
+          </span>
+        </label>
+      )}
       <button type="submit" disabled={busy} className={btnPrimary}>
         {busy ? "Creating…" : "Create director"}
       </button>

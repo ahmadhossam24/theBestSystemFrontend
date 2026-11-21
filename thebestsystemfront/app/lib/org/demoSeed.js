@@ -28,9 +28,11 @@ export async function seedDemoOrg(svc, directorId, password = DEMO_PASSWORD) {
     ["agent", "mona", "Mona", { teamId: support.id }],
   ];
   const created = [];
+  const userIds = {};
   for (const [role, username, displayName, where] of people) {
     const u = await need(svc.createUser(directorId, { username, password, displayName, role, ...where }));
     created.push({ username: u.username, name: u.displayName, role });
+    userIds[u.username] = u.id;
   }
-  return { password, accounts: created, branches: [cairo, alex], teams: [salesA, salesB, support] };
+  return { password, accounts: created, userIds, branches: [cairo, alex], teams: [salesA, salesB, support] };
 }

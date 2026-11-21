@@ -10,6 +10,7 @@ export function canOpenPath(user, pathname) {
   if (p === "/branches" || p.startsWith("/branches/")) return is(user.role, "director", "branchAdmin");
   if (p === "/users" || p.startsWith("/users/")) return isAdminRole(user.role);
   if (p === "/setup-table" || p.startsWith("/setup-table/")) return isAdminRole(user.role);
+  if (p === "/export" || p.startsWith("/export/")) return isAdminRole(user.role);
   return true; // home, teams (views limit actions), tables, placeholders
 }
 

@@ -11,6 +11,7 @@ import { makeEditEvent } from "../../lib/data/history";
 import { bulkColumns, planBulkEdit } from "../../lib/data/bulk";
 import { planTransfer, transferTargets } from "../../lib/data/transfer";
 import { useSession } from "../../lib/org/session.js";
+import { tableToAoa, downloadWorkbook, safeFileName, stampForFile } from "../../lib/data/xlsxExport.js";
 import { useScope } from "../../lib/org/scope.js";
 import { tableCaps, canReachTeam } from "../../lib/data/dataRules";
 import { usePerms } from "../../lib/data/permStore";
@@ -227,6 +228,19 @@ export default function TablePage() {
   // Transfers only ever go INTO a general table (never a dataset table, never the one you're in).
   const targets = useMemo(() => (table ? transferTargets(tables, table) : []), [tables, table]);
 
+  // Admins: download exactly what the grid shows now (search, filters, dataset type, visible columns).
+  const [exporting, setExporting] = useState(false);
+  const exportView = async () => {
+    if (!caps.export) return;
+    setExporting(true);
+    try {
+      const aoa = tableToAoa(columns, visibleRows, (row, c) => getCellValue(row, c, tables));
+      await downloadWorkbook([{ name: table.name, aoa }], `${safeFileName(`${team?.name || "team"}-${table.name}`)}-${stampForFile()}.xlsx`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const transferSelected = async (targetId) => {
     if (!caps.transfer) return;
     const target = tables.find((t) => t.id === targetId && t.tableType === "general");
@@ -294,6 +308,18 @@ export default function TablePage() {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="flex items-center gap-2">
+            {caps.export && (
+              <button
+                type="button"
+                data-testid="export-table"
+                onClick={exportView}
+                disabled={loading || exporting}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                title="Download the rows you see now (with the current search, filters and dataset type) as an Excel file"
+              >
+                {exporting ? "Exporting…" : `Export Excel (${visibleRows.length.toLocaleString()})`}
+              </button>
+            )}
             {caps.import && <ImportButton table={table} columns={importColumns} onConfirm={importRecords} disabled={loading} />}
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} rows

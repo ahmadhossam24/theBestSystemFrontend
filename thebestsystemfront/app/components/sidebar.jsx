@@ -21,7 +21,7 @@ import {
   FaChartPie,
   FaDollarSign,
   FaGlobe,
-  FaLock,
+  FaLock, FaFileExcel,
   FaPalette,
 } from "react-icons/fa";
 import { BsWrenchAdjustable } from "react-icons/bs";
@@ -102,6 +102,7 @@ function buildSections(tables, loaded, role) {
     },
     { id: "data", label: "Data", icon: FaDatabase, hasSubmenu: true, submenuItems: dataItems },
     { id: "setupTables", label: "Setup Table", icon: BsWrenchAdjustable, hasSubmenu: false, path: "/setup-table" },
+    { id: "exportData", label: "Export Data", icon: FaFileExcel, hasSubmenu: false, path: "/export" },
     {
       id: "reports",
       label: "Reports",
@@ -129,7 +130,7 @@ function buildSections(tables, loaded, role) {
   // Hide whole sections the role can't open.
   const hidden = new Set();
   if (!top) hidden.add("branches");
-  if (!admin) ["users", "setupTables", "auditlog"].forEach((id) => hidden.add(id));
+  if (!admin) ["users", "setupTables", "exportData", "auditlog"].forEach((id) => hidden.add(id));
   return all.filter((x) => !hidden.has(x.id));
 }
 
