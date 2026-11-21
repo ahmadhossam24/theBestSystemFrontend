@@ -13,6 +13,8 @@ import { planTransfer, transferTargets } from "../../lib/data/transfer";
 import { useSession } from "../../lib/org/session.js";
 import { useScope } from "../../lib/org/scope.js";
 import { tableCaps, canReachTeam } from "../../lib/data/dataRules";
+import { usePerms } from "../../lib/data/permStore";
+import { modeFor, visibleColumns, tableVisibleTo } from "../../lib/data/agentPerms";
 import { useTeamAgents, withAgentOptions } from "../../lib/data/agents";
 import { countSampleRows, deleteSampleRows, putRows, saveRowWithEvent } from "../../lib/data/db";
 import { buildImportedRows } from "../../lib/data/xlsxImport";
@@ -39,7 +41,11 @@ export default function TablePage() {
   const { teams, ready: teamsReady } = useScope(user);
   const found = useMemo(() => everyTable.find((t) => t.id === tableId), [everyTable, tableId]);
   // Only people who can see the table's team may open it (otherwise it looks like it doesn't exist).
-  const allowed = !!found && teamsReady && canReachTeam(teams, found.teamId);
+  const { perms, ready: permsReady } = usePerms();
+  // an agent whose every column is hidden doesn't see the table at all
+  const sameTeamTables = useMemo(() => (found ? everyTable.filter((t) => t.teamId === found.teamId) : []), [everyTable, found]);
+  const seesTable = !found || !user || tableVisibleTo(perms, user, found, resolveColumns(found, sameTeamTables, null));
+  const allowed = !!found && teamsReady && permsReady && canReachTeam(teams, found.teamId) && seesTable;
   const table = allowed ? found : undefined;
   // Everything below (dataset types, transfers, columns) works inside the table's own team.
   const tables = useMemo(() => (table ? everyTable.filter((t) => t.teamId === table.teamId) : []), [everyTable, table]);
@@ -88,7 +94,10 @@ export default function TablePage() {
     }
   }, [datasetFilter, datasetTables]);
 
-  const columns = useMemo(() => (table ? withAgentOptions(resolveColumns(table, tables, datasetFilter), agents) : []), [table, tables, datasetFilter, agents]);
+  const allColumns = useMemo(() => (table ? withAgentOptions(resolveColumns(table, tables, datasetFilter), agents) : []), [table, tables, datasetFilter, agents]);
+  // agents only get the columns an admin left visible; everything below (search, filters, grid) uses this list
+  const columns = useMemo(() => (table ? visibleColumns(perms, user, table.id, allColumns) : []), [perms, user, table, allColumns]);
+  const canEditCol = (c) => !c.readOnly && caps.editCells && modeFor(perms, user, table.id, c) === "edit";
   // Excel headers are matched against the table's OWN columns (a direct upload has no dataset type).
   const importColumns = useMemo(() => (table ? withAgentOptions(resolveColumns(table, tables, null), agents) : []), [table, tables, agents]);
   const filterCols = useMemo(() => filterableColumns(columns), [columns]);
@@ -128,7 +137,7 @@ export default function TablePage() {
   // Update the screen immediately, then save row + history event together.
   // If saving fails, re-read from the database so the screen shows the truth.
   const editCell = async (row, col, value) => {
-    if (!caps.editCells) return;
+    if (!canEditCol(col)) return;
     const old = getCellValue(row, col, tables);
     if (String(old) === String(value)) return;
     const next = applyCellEdit(row, col, value);
@@ -252,7 +261,7 @@ export default function TablePage() {
     setDatasetFilter("");
   };
 
-  if (!loaded || !user || !teamsReady) return <p className="text-sm text-slate-400">Loading…</p>;
+  if (!loaded || !user || !teamsReady || !permsReady) return <p className="text-sm text-slate-400">Loading…</p>;
 
   if (!table) {
     return (
@@ -292,7 +301,7 @@ export default function TablePage() {
           </div>
           <span className="text-xs text-slate-400" data-testid="table-team">
             Team: {team?.name || "—"}
-            {caps.editCells ? "" : " · view only (transfer allowed)"}
+            {user.role === "agent" ? " · what you can see and edit is set by an admin" : ""}
           </span>
         </div>
       </div>
@@ -425,9 +434,9 @@ export default function TablePage() {
                 </td>
                 {columns.map((c) => {
                   const v = getCellValue(row, c, tables);
-                  if (c.readOnly || !caps.editCells) {
+                  if (!canEditCol(c)) {
                     return (
-                      <td key={c.cellId} className="whitespace-nowrap px-3 py-2 text-sm text-slate-500" title={c.readOnly ? "Set by the system" : "View only"}>
+                      <td key={c.cellId} className="whitespace-nowrap px-3 py-2 text-sm text-slate-500" title={c.readOnly ? "Set by the system" : "Read-only"}>
                         {v === "" ? <span className="text-slate-300">—</span> : v}
                       </td>
                     );

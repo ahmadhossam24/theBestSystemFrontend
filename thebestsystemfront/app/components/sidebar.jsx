@@ -31,6 +31,9 @@ import { isAdminRole } from "../lib/org/roles.js";
 import { useSession } from "../lib/org/session.js";
 import { useScope } from "../lib/org/scope.js";
 import ScopePicker from "./org/ScopePicker.jsx";
+import { usePerms } from "../lib/data/permStore";
+import { tableVisibleTo } from "../lib/data/agentPerms";
+import { resolveColumns } from "../lib/data/rowModel";
 import { RoleBadge } from "./org/ui.jsx";
 
 // The "Data" menu is GENERATED from the tables made on the Setup Table page:
@@ -140,7 +143,13 @@ export default function Sidebar({ user }) {
   const pathname = usePathname();
   const { signOut } = useSession();
   const { branches, teams, scope, choose } = useScope(user);
-  const { tables, loaded } = useTables(scope.teamId || null); // the chosen team's tables only
+  const { tables: teamTables, loaded } = useTables(scope.teamId || null); // the chosen team's tables only
+  const { perms } = usePerms();
+  // agents don't see tables whose columns are all hidden from them
+  const tables = useMemo(
+    () => (user.role === "agent" ? teamTables.filter((t) => tableVisibleTo(perms, user, t, resolveColumns(t, teamTables, null))) : teamTables),
+    [teamTables, perms, user]
+  );
   const sections = useMemo(() => buildSections(tables, loaded, user.role), [tables, loaded, user.role]);
   const [expandedSections, setExpandedSections] = useState({});
 

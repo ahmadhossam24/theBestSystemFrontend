@@ -1,1 +1,4 @@
-from where can i change feedback list
+from where i can control feedback choices 
+delete data dont exist
+لما بتقولهم انا فلترتلكم الداتا - ايه اللي بيحصل 
+تاريخ عرض الداتا في الجدول المفروض يكون من ايه لايه by default 

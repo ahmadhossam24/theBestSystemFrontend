@@ -8,6 +8,9 @@ import { getHistory, getRow } from "../../../../lib/data/db";
 import { useSession } from "../../../../lib/org/session.js";
 import { useScope } from "../../../../lib/org/scope.js";
 import { canReachTeam } from "../../../../lib/data/dataRules";
+import { usePerms } from "../../../../lib/data/permStore";
+import { eventVisibleTo, tableVisibleTo } from "../../../../lib/data/agentPerms";
+import { resolveColumns } from "../../../../lib/data/rowModel";
 import { describeEvent, formatStamp } from "../../../../lib/data/history";
 
 export default function RowHistoryPage() {
@@ -16,7 +19,9 @@ export default function RowHistoryPage() {
   const { user } = useSession();
   const { teams, ready: teamsReady } = useScope(user);
   const found = tables.find((t) => t.id === tableId);
-  const allowed = !!found && teamsReady && canReachTeam(teams, found.teamId);
+  const { perms, ready: permsReady } = usePerms();
+  const seesTable = !found || !user || tableVisibleTo(perms, user, found, resolveColumns(found, tables.filter((t) => t.teamId === found.teamId), null));
+  const allowed = !!found && teamsReady && permsReady && canReachTeam(teams, found.teamId) && seesTable;
   const table = allowed ? found : undefined;
 
   const [state, setState] = useState({ status: "loading", row: null, events: [] });
@@ -37,7 +42,9 @@ export default function RowHistoryPage() {
   }, [rowId]);
 
   const backHref = table ? `/tables/${table.id}` : "/";
-  const { row: rawRow, events } = state;
+  const { row: rawRow, events: allEvents } = state;
+  // an agent never sees old/new values of columns that are hidden from him
+  const events = allEvents.filter((e) => eventVisibleTo(perms, user, tableId, e));
   // the row must belong to this table's own team (a URL can't be used to peek at another team's row)
   const row =
     table && rawRow && [rawRow.datasetTableId, rawRow.generalTableId].some((id) => id && tables.find((t) => t.id === id)?.teamId === table.teamId) ? rawRow : null;
